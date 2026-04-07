@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>4CHESS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=4">
+</head>
+<body>
+    
+    <!-- Login Screen -->
+    <div id="login-screen">
+        <div class="modal-content">
+            <h1 style="color:var(--color-blue); margin-bottom:5px;">4CHESS</h1>
+            <p>Destansı çok oyunculu oyuna katıl</p>
+            <input type="text" id="username-input" placeholder="Oyuncu Adınız" maxlength="15">
+            <button id="btn-login" style="width:100%;">Giriş Yap</button>
+        </div>
+    </div>
+
+    <!-- Matchmaking/Lobby Screen -->
+    <div id="lobby-screen" class="hidden">
+        <div class="modal-content">
+            <h2>Eşleştirme Bekleniyor 🔍</h2>
+            <div id="queue-status" style="font-size:1.2rem; font-weight:600; color:var(--board-light);">Bağlanılıyor...</div>
+            <div class="spinner"></div>
+            <p class="small-text" style="color:#64748b; margin-top:20px; font-size:0.85rem;">Not: Yaklaşık 1 dakika içinde oyuncu kontenjanı dolmazsa eksik koltuklara zorlu Botlar yerleşecek ve oyun başlayacaktır.</p>
+        </div>
+    </div>
+
+    <!-- Match interface -->
+    <div id="game-container" class="hidden">
+        <div id="turn-indicator-wrapper">
+            <div id="turn-indicator">Sıra: Beyaz</div>
+            <div id="game-status-text">Oyun Başlıyor</div>
+        </div>
+
+        <div id="board-wrapper">
+            <!-- Screen HUDs -->
+            <div class="screen-panel panel-top" id="panel-screen-top">
+                <span class="player-name">...</span>
+                <span class="player-status">...</span>
+                <span class="player-score">...</span>
+            </div>
+            
+            <div class="screen-panel panel-left" id="panel-screen-left">
+                <span class="player-name">...</span>
+                <span class="player-status">...</span>
+                <span class="player-score">...</span>
+            </div>
+
+            <div id="chess-board"></div>
+
+            <div class="screen-panel panel-right" id="panel-screen-right">
+                <span class="player-name">...</span>
+                <span class="player-status">...</span>
+                <span class="player-score">...</span>
+            </div>
+
+            <div class="screen-panel panel-bottom" id="panel-screen-bottom">
+                <span class="player-name">...</span>
+                <span class="player-status">...</span>
+                <span class="player-score">...</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-over-modal" class="hidden">
+        <div class="modal-content">
+            <h2 id="winner-text">Oyun Bitti!</h2>
+            <p>Oda süresi doldu veya kazanan belirlendi. Lütfen lobiden tekrar eşleşin.</p>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="engine.js?v=4"></script>
+    <script src="ui.js?v=4"></script>
+</body>
+</html>
