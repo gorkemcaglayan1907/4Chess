@@ -15,6 +15,7 @@ let validMovesForSelected = [];
 let cellsDOM = [];
 let playerNamesMap = {};
 let playerFlagsMap = {};
+let turnEndTime = 0;
 let boardRotation = 0;
 let panelMap = { white: 'bottom', black: 'top', blue: 'left', red: 'right' };
 
@@ -45,6 +46,7 @@ function getFlagEmoji(countryCode) {
 const boardDiv = document.getElementById('chess-board');
 const indicator = document.getElementById('turn-indicator');
 const statusText = document.getElementById('game-status-text');
+const turnTimerDOM = document.getElementById('turn-timer-visual');
 
 const usernameInput = document.getElementById('username-input');
 const flagSelect = document.getElementById('flag-select');
@@ -137,6 +139,7 @@ function syncState(state) {
     game.winner = state.winner;
     playerNamesMap = state.playerNames;
     playerFlagsMap = state.playerFlags || {};
+    turnEndTime = state.turnEndTime || 0;
     
     selectedCell = null;
     validMovesForSelected = [];
@@ -236,12 +239,6 @@ function updateUI() {
                 pDiv.className = `piece ${p.color}`;
                 pDiv.innerText = UNICODE[p.type];
                 
-                let flagCode = playerFlagsMap[p.color];
-                if (flagCode) {
-                    pDiv.style.backgroundImage = `url('https://flagcdn.com/w40/${flagCode}.png')`;
-                    pDiv.classList.add('flagged');
-                }
-                
                 pDiv.style.setProperty('--rot', `rotate(${-boardRotation}deg)`);
                 cellDOM.appendChild(pDiv);
             }
@@ -300,3 +297,25 @@ function updateUI() {
         statusText.innerText = "Oyun Bitti";
     }
 }
+
+function renderTimer() {
+    if (game && !game.gameOver && turnEndTime > 0) {
+        let leftMs = turnEndTime - Date.now();
+        if (leftMs < 0) leftMs = 0;
+        let secs = Math.ceil(leftMs / 1000);
+        
+        if (secs <= 5) {
+            turnTimerDOM.style.color = '#ef4444'; // Red
+            turnTimerDOM.style.transform = `scale(${1 + (leftMs % 1000 < 500 ? 0.1 : 0)})`; 
+        } else {
+            turnTimerDOM.style.color = '#f59e0b'; // Orange
+            turnTimerDOM.style.transform = 'scale(1)';
+        }
+        
+        turnTimerDOM.innerText = `⏳ ${secs} saniye`;
+    } else if (turnTimerDOM) {
+        turnTimerDOM.innerText = '';
+    }
+    requestAnimationFrame(renderTimer);
+}
+requestAnimationFrame(renderTimer);

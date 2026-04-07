@@ -21,6 +21,7 @@ function generateId() {
 }
 
 const BOT_FLAGS = ['un', 'eu', 'earth', 'aq'];
+const TURN_TIME_MS = 20000;
 
 function processQueue(forceStart = false) {
     if (waitingQueue.length === 0) return;
@@ -68,9 +69,10 @@ function processQueue(forceStart = false) {
             botCount++;
         });
 
-        rooms[roomId] = { game, players, playerNames, playerFlags, bots };
+        rooms[roomId] = { game, players, playerNames, playerFlags, bots, turnTimer: null, turnEndTime: 0 };
         
         secondsLeft = 30; // Sonraki sıra için reset
+        startTurnTimer(roomId);
         startGameLoop(roomId);
         
         if (waitingQueue.length > 0) processQueue();
@@ -110,12 +112,38 @@ function triggerBotMove(roomId) {
                 let bestMove = room.game.getBestMove(currentColor);
                 if (bestMove) {
                     let res = room.game.movePiece(bestMove.fx, bestMove.fy, bestMove.tx, bestMove.ty);
+                    startTurnTimer(roomId);
                     broadcastRoomState(roomId, res.promoted);
                     triggerBotMove(roomId);
                 }
             }
         }, 1500); 
     }
+}
+
+function forceBotMove(roomId) {
+    let room = rooms[roomId];
+    if (!room || room.game.gameOver) return;
+    let currentColor = room.game.getCurrentTurnColor();
+    let bestMove = room.game.getBestMove(currentColor);
+    if (bestMove) {
+        let res = room.game.movePiece(bestMove.fx, bestMove.fy, bestMove.tx, bestMove.ty);
+        startTurnTimer(roomId);
+        broadcastRoomState(roomId, res.promoted);
+        triggerBotMove(roomId);
+    }
+}
+
+function startTurnTimer(roomId) {
+    let room = rooms[roomId];
+    if (!room || room.game.gameOver) return;
+
+    if (room.turnTimer) clearTimeout(room.turnTimer);
+    
+    room.turnEndTime = Date.now() + TURN_TIME_MS;
+    room.turnTimer = setTimeout(() => {
+        forceBotMove(roomId);
+    }, TURN_TIME_MS);
 }
 
 function broadcastRoomState(roomId, promoted = false) {
@@ -131,6 +159,7 @@ function broadcastRoomState(roomId, promoted = false) {
         winner: room.game.winner,
         playerNames: room.playerNames,
         playerFlags: room.playerFlags,
+        turnEndTime: room.turnEndTime,
         promoted: promoted
     });
 }
@@ -147,7 +176,8 @@ function startGameLoop(roomId) {
         gameOver: room.game.gameOver,
         winner: room.game.winner,
         playerNames: room.playerNames,
-        playerFlags: room.playerFlags
+        playerFlags: room.playerFlags,
+        turnEndTime: room.turnEndTime
     });
     triggerBotMove(roomId);
 }
@@ -174,6 +204,7 @@ io.on('connection', (socket) => {
         let validMoves = room.game.getValidMoves(data.fx, data.fy);
         if (validMoves.some(m => m.x === data.tx && m.y === data.ty)) {
             let result = room.game.movePiece(data.fx, data.fy, data.tx, data.ty);
+            startTurnTimer(roomId);
             broadcastRoomState(roomId, result.promoted);
             triggerBotMove(roomId);
         }
