@@ -9,22 +9,29 @@ const { GameEngine, CHESS_COLORS } = require('./engine.js');
 
 app.use(express.static(__dirname));
 
-let waitingQueue = []; // { socket, username }
-let matchTimer = null;
-let rooms = {}; // roomId -> { game, players, playerNames, bots }
-let userRooms = {}; // socket.id -> roomId
+let waitingQueue = []; 
+let queueTimeoutInterval = null;
+let secondsLeft = 30;
+
+let rooms = {}; 
+let userRooms = {}; 
 
 function generateId() {
     return Math.random().toString(36).substring(2, 9);
 }
 
+const BOT_FLAGS = ['un', 'eu', 'earth', 'aq'];
+
 function processQueue(forceStart = false) {
     if (waitingQueue.length === 0) return;
     
-    if (waitingQueue.length >= 4 || forceStart) {
-        if (matchTimer) {
-            clearTimeout(matchTimer);
-            matchTimer = null;
+    let isFull = waitingQueue.length >= 4;
+    
+    if (isFull || forceStart) {
+        // Zamanlayıcıyı durdur
+        if (queueTimeoutInterval) {
+            clearInterval(queueTimeoutInterval);
+            queueTimeoutInterval = null;
         }
 
         let playersInMatch = waitingQueue.splice(0, 4);
@@ -32,15 +39,16 @@ function processQueue(forceStart = false) {
         let game = new GameEngine();
         let players = {};
         let playerNames = {};
+        let playerFlags = {};
         let bots = [];
 
         let availableColors = [...CHESS_COLORS];
         
-        // Gerçek Oyuncular
         playersInMatch.forEach((p) => {
             let assignedColor = availableColors.shift();
             players[p.socket.id] = assignedColor;
             playerNames[assignedColor] = p.username || "Misafir";
+            playerFlags[assignedColor] = p.flag || "tr";
             userRooms[p.socket.id] = roomId;
             p.socket.join(roomId);
             
@@ -50,25 +58,33 @@ function processQueue(forceStart = false) {
             });
         });
 
-        // Kalan renkleri yapay zekaya (Bot) ver
+        // Botlara otomatik bayrak
         let botCount = 1;
         availableColors.forEach(botColor => {
             bots.push(botColor);
             playerNames[botColor] = "Zorlu Bot " + botCount;
+            // Botlara özel bayrak kombinasyonu
+            playerFlags[botColor] = BOT_FLAGS[Math.floor(Math.random() * BOT_FLAGS.length)] || 'un';
             botCount++;
         });
 
-        rooms[roomId] = { game, players, playerNames, bots };
-        console.log(`Oda oluşturuldu [${roomId}]. Oyuncular: ${playersInMatch.length}, Botlar: ${bots.length}`);
-
+        rooms[roomId] = { game, players, playerNames, playerFlags, bots };
+        
+        secondsLeft = 30; // Sonraki sıra için reset
         startGameLoop(roomId);
         
         if (waitingQueue.length > 0) processQueue();
     } else {
-        if (!matchTimer && waitingQueue.length > 0) {
-            matchTimer = setTimeout(() => {
-                processQueue(true); // 60s timeout
-            }, 60000); 
+        // Bekleyen sayısı 4 ten azsa Timer'i aktifleştir
+        if (!queueTimeoutInterval && waitingQueue.length > 0) {
+            secondsLeft = 30;
+            queueTimeoutInterval = setInterval(() => {
+                secondsLeft--;
+                broadcastQueueUpdate();
+                if (secondsLeft <= 0) {
+                    processQueue(true); // Süre bitince zorla başlat
+                }
+            }, 1000);
         }
         broadcastQueueUpdate();
     }
@@ -77,7 +93,7 @@ function processQueue(forceStart = false) {
 function broadcastQueueUpdate() {
     let count = waitingQueue.length;
     waitingQueue.forEach(p => {
-        p.socket.emit('queue_update', { count, max: 4 }); 
+        p.socket.emit('queue_update', { count, max: 4, secondsLeft }); 
     });
 }
 
@@ -96,8 +112,6 @@ function triggerBotMove(roomId) {
                     let res = room.game.movePiece(bestMove.fx, bestMove.fy, bestMove.tx, bestMove.ty);
                     broadcastRoomState(roomId, res.promoted);
                     triggerBotMove(roomId);
-                } else {
-                    console.log(`Bot ${currentColor} hamle bulamadı!`);
                 }
             }
         }, 1500); 
@@ -116,6 +130,7 @@ function broadcastRoomState(roomId, promoted = false) {
         gameOver: room.game.gameOver,
         winner: room.game.winner,
         playerNames: room.playerNames,
+        playerFlags: room.playerFlags,
         promoted: promoted
     });
 }
@@ -131,18 +146,17 @@ function startGameLoop(roomId) {
         activePlayers: room.game.activePlayers,
         gameOver: room.game.gameOver,
         winner: room.game.winner,
-        playerNames: room.playerNames
+        playerNames: room.playerNames,
+        playerFlags: room.playerFlags
     });
     triggerBotMove(roomId);
 }
 
 io.on('connection', (socket) => {
-    console.log('Kullanıcı bağlandı:', socket.id);
-    
     socket.on('join_queue', (data) => {
         let name = data.username.trim() || 'Misafir';
         if (name.length > 15) name = name.substring(0, 15);
-        waitingQueue.push({ socket, username: name });
+        waitingQueue.push({ socket, username: name, flag: data.flag || 'tr' });
         processQueue();
     });
 
@@ -155,7 +169,7 @@ io.on('connection', (socket) => {
         if (playerColor !== room.game.getCurrentTurnColor()) return; 
         
         let piece = room.game.getPieceAt(data.fx, data.fy);
-        if (!piece || piece.color !== playerColor) return; // Strict ownership enforcement
+        if (!piece || piece.color !== playerColor) return; 
 
         let validMoves = room.game.getValidMoves(data.fx, data.fy);
         if (validMoves.some(m => m.x === data.tx && m.y === data.ty)) {
@@ -166,12 +180,11 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        console.log('Kullanıcı koptu:', socket.id);
         waitingQueue = waitingQueue.filter(p => p.socket.id !== socket.id);
         
-        if (waitingQueue.length === 0 && matchTimer) {
-             clearTimeout(matchTimer);
-             matchTimer = null;
+        if (waitingQueue.length === 0 && queueTimeoutInterval) {
+             clearInterval(queueTimeoutInterval);
+             queueTimeoutInterval = null;
         } else {
              broadcastQueueUpdate();
         }
@@ -182,7 +195,6 @@ io.on('connection', (socket) => {
             let color = room.players[socket.id];
             
             if (color && room.game.activePlayers[color] && !room.game.gameOver) {
-                console.log(`Oyuncu koptu. Yapay Zeka bot devralıyor (${color}).`);
                 room.bots.push(color);
                 delete room.players[socket.id];
                 

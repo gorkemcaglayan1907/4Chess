@@ -15,6 +15,15 @@
             <h1 style="color:var(--color-blue); margin-bottom:5px;">4CHESS</h1>
             <p>Destansı çok oyunculu oyuna katıl</p>
             <input type="text" id="username-input" placeholder="Oyuncu Adınız" maxlength="15">
+            <select id="flag-select" style="width:100%; padding: 10px; margin-bottom: 20px; border-radius: 8px; font-weight: 600;">
+                <option value="tr">🇹🇷 Türkiye</option>
+                <option value="us">🇺🇸 USA</option>
+                <option value="gb">🇬🇧 Birleşik Krallık</option>
+                <option value="de">🇩🇪 Almanya</option>
+                <option value="fr">🇫🇷 Fransa</option>
+                <option value="jp">🇯🇵 Japonya</option>
+                <option value="br">🇧🇷 Brezilya</option>
+            </select>
             <button id="btn-login" style="width:100%;">Giriş Yap</button>
         </div>
     </div>
@@ -24,8 +33,9 @@
         <div class="modal-content">
             <h2>Eşleştirme Bekleniyor 🔍</h2>
             <div id="queue-status" style="font-size:1.2rem; font-weight:600; color:var(--board-light);">Bağlanılıyor...</div>
+            <div id="timer-status" style="font-size:2rem; font-weight:800; color:var(--color-red); margin-top:10px;">30dk</div>
             <div class="spinner"></div>
-            <p class="small-text" style="color:#64748b; margin-top:20px; font-size:0.85rem;">Not: Yaklaşık 1 dakika içinde oyuncu kontenjanı dolmazsa eksik koltuklara zorlu Botlar yerleşecek ve oyun başlayacaktır.</p>
+            <p class="small-text" style="color:#64748b; margin-top:20px; font-size:0.85rem;">Süre dolduğunda boş koltuklara botlar eklenecek.</p>
         </div>
     </div>
 

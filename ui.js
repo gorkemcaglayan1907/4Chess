@@ -14,6 +14,7 @@ let selectedCell = null;
 let validMovesForSelected = [];
 let cellsDOM = [];
 let playerNamesMap = {};
+let playerFlagsMap = {};
 let boardRotation = 0;
 let panelMap = { white: 'bottom', black: 'top', blue: 'left', red: 'right' };
 
@@ -22,28 +23,42 @@ const indicator = document.getElementById('turn-indicator');
 const statusText = document.getElementById('game-status-text');
 
 const usernameInput = document.getElementById('username-input');
+const flagSelect = document.getElementById('flag-select');
 
 // Daha önce giriş yapmış mı kontrol et
 const savedUsername = localStorage.getItem('4chess_username');
+const savedFlag = localStorage.getItem('4chess_flag');
 if (savedUsername) {
     usernameInput.value = savedUsername;
+}
+if (savedFlag) {
+    flagSelect.value = savedFlag;
 }
 
 document.getElementById('btn-login').addEventListener('click', () => {
     let name = usernameInput.value;
+    let flag = flagSelect.value;
     if (name.trim() === '') name = 'İsimsiz' + Math.floor(Math.random()*100);
     
     // İsmi kalıcı olarak cihaz hafızasına ('Hesap' gibi) kaydet
     localStorage.setItem('4chess_username', name.trim());
+    localStorage.setItem('4chess_flag', flag);
     
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('lobby-screen').classList.remove('hidden');
     
-    socket.emit('join_queue', { username: name });
+    socket.emit('join_queue', { username: name, flag: flag });
 });
 
 socket.on('queue_update', (data) => {
     document.getElementById('queue-status').innerText = `Koltuklar Doluyor: ${data.count} / ${data.max}`;
+    let timerDiv = document.getElementById('timer-status');
+    if (data.count === 0) {
+        timerDiv.innerText = '';
+    } else {
+        let sc = data.secondsLeft < 10 ? '0'+data.secondsLeft : data.secondsLeft;
+        timerDiv.innerText = `00:${sc}`;
+    }
 });
 
 socket.on('match_found', (data) => {
@@ -73,6 +88,7 @@ socket.on('match_found', (data) => {
 socket.on('init_state', (state) => {
     game = state; 
     playerNamesMap = state.playerNames;
+    playerFlagsMap = state.playerFlags || {};
     syncState(state);
 });
 
@@ -88,6 +104,7 @@ function syncState(state) {
     game.gameOver = state.gameOver;
     game.winner = state.winner;
     playerNamesMap = state.playerNames;
+    playerFlagsMap = state.playerFlags || {};
     
     selectedCell = null;
     validMovesForSelected = [];
@@ -186,6 +203,13 @@ function updateUI() {
                 let pDiv = document.createElement('div');
                 pDiv.className = `piece ${p.color}`;
                 pDiv.innerText = UNICODE[p.type];
+                
+                let flagCode = playerFlagsMap[p.color];
+                if (flagCode) {
+                    pDiv.style.backgroundImage = `url('https://flagcdn.com/w40/${flagCode}.png')`;
+                    pDiv.classList.add('flagged');
+                }
+                
                 pDiv.style.setProperty('--rot', `rotate(${-boardRotation}deg)`);
                 cellDOM.appendChild(pDiv);
             }
@@ -216,7 +240,10 @@ function updateUI() {
         let nameField = pnl.querySelector('.player-name');
         let scoreField = pnl.querySelector('.player-score');
         
-        nameField.innerText = `${playerNamesMap[c] || TR_COLORS[c]}`;
+        let cFlag = playerFlagsMap[c];
+        let flagImg = cFlag ? `<img src="https://flagcdn.com/w20/${cFlag}.png" style="vertical-align:middle; width:16px; margin-right:4px; border-radius:2px;" />` : '';
+        
+        nameField.innerHTML = `${flagImg}${playerNamesMap[c] || TR_COLORS[c]}`;
         scoreField.innerText = `Puan: ${(game.scores && game.scores[c]) || 0}`;
         
         if (!game.activePlayers[c]) {
