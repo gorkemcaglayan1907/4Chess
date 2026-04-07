@@ -18,12 +18,44 @@ let playerFlagsMap = {};
 let boardRotation = 0;
 let panelMap = { white: 'bottom', black: 'top', blue: 'left', red: 'right' };
 
+const ALL_FLAGS = [
+    {code: 'tr', name: 'Türkiye'}, {code: 'az', name: 'Azerbaycan'}, {code: 'us', name: 'ABD'},
+    {code: 'de', name: 'Almanya'}, {code: 'ar', name: 'Arjantin'}, {code: 'au', name: 'Avustralya'},
+    {code: 'at', name: 'Avusturya'}, {code: 'ae', name: 'BAE'}, {code: 'be', name: 'Belçika'}, 
+    {code: 'gb', name: 'Birleşik Krallık'}, {code: 'br', name: 'Brezilya'}, {code: 'bg', name: 'Bulgaristan'}, 
+    {code: 'dz', name: 'Cezayir'}, {code: 'cn', name: 'Çin'}, {code: 'dk', name: 'Danimarka'}, 
+    {code: 'id', name: 'Endonezya'}, {code: 'ma', name: 'Fas'}, {code: 'ps', name: 'Filistin'}, 
+    {code: 'fi', name: 'Finlandiya'}, {code: 'fr', name: 'Fransa'}, {code: 'za', name: 'Güney Afrika'}, 
+    {code: 'kr', name: 'Güney Kore'}, {code: 'in', name: 'Hindistan'}, {code: 'nl', name: 'Hollanda'}, 
+    {code: 'iq', name: 'Irak'}, {code: 'ir', name: 'İran'}, {code: 'es', name: 'İspanya'}, 
+    {code: 'se', name: 'İsveç'}, {code: 'ch', name: 'İsviçre'}, {code: 'it', name: 'İtalya'}, 
+    {code: 'jp', name: 'Japonya'}, {code: 'ca', name: 'Kanada'}, {code: 'kz', name: 'Kazakistan'}, 
+    {code: 'my', name: 'Malezya'}, {code: 'mx', name: 'Meksika'}, {code: 'eg', name: 'Mısır'}, 
+    {code: 'no', name: 'Norveç'}, {code: 'pk', name: 'Pakistan'}, {code: 'pl', name: 'Polonya'}, 
+    {code: 'ro', name: 'Romanya'}, {code: 'ru', name: 'Rusya'}, {code: 'sg', name: 'Singapur'}, 
+    {code: 'sy', name: 'Suriye'}, {code: 'sa', name: 'Suudi Arabistan'}, {code: 'ua', name: 'Ukrayna'}, 
+    {code: 'gr', name: 'Yunanistan'}
+];
+
+function getFlagEmoji(countryCode) {
+  const codePoints = countryCode.toUpperCase().split('').map(char => 127397 + char.charCodeAt(0));
+  return String.fromCodePoint(...codePoints);
+}
+
 const boardDiv = document.getElementById('chess-board');
 const indicator = document.getElementById('turn-indicator');
 const statusText = document.getElementById('game-status-text');
 
 const usernameInput = document.getElementById('username-input');
 const flagSelect = document.getElementById('flag-select');
+
+// Flag options populate
+ALL_FLAGS.forEach(f => {
+    let opt = document.createElement('option');
+    opt.value = f.code;
+    opt.innerText = `${getFlagEmoji(f.code)} ${f.name}`;
+    flagSelect.appendChild(opt);
+});
 
 // Daha önce giriş yapmış mı kontrol et
 const savedUsername = localStorage.getItem('4chess_username');
