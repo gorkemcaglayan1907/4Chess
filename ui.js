@@ -43,7 +43,7 @@ const DICT = {
         win_br: "Winner: Blue/Red Team!",
         win_p: "Winner: ",
         
-        colors: { white: 'White', blue: 'Blue', black: 'Black', red: 'Red' },
+        colors: { white: 'Green', blue: 'Blue', black: 'Black', red: 'Red' },
         
         resign_confirm: "Are you sure you want to resign? Your ally might be left alone!",
         err_code: "Invalid Room Code!",
@@ -86,9 +86,10 @@ const DICT = {
         win_br: "Kazanan: Mavi/Kırmızı Takımı!",
         win_p: "Kazanan: ",
         
-        colors: { white: 'Beyaz', blue: 'Mavi', black: 'Siyah', red: 'Kırmızı' },
+        colors: { white: 'Yeşil', blue: 'Mavi', black: 'Siyah', red: 'Kırmızı' },
         
-        resign_confirm: "Gerçekten pes etmek ve çekilmek istiyor musunuz? Müttefikiniz zor durumda kalabilir!",
+        resign_confirm: "Hamle sıranızı Yapay Zeka devralacak. Emin misiniz?",
+        exit_confirm: "Ana menüye dönerseniz pes etmiş sayılacaksınız ve yerinizi bot alacak. Emin misiniz?",
         err_code: "Geçersiz Oda Kodu!",
         room_txt: "Oda: ",
         room_wait: DICT[currentLang].room_wait
@@ -285,12 +286,13 @@ socket.on('room_error', (msg) => {
 });
 
 socket.on('queue_update', (data) => {
-    document.getElementById('queue-status').innerText = `Koltuklar Doluyor: ${data.count} / ${data.max}`;
+    document.getElementById('queue-status').innerText = `Sıra Bekleniyor: ${data.count} / ${data.max}`;
     let timerDiv = document.getElementById('timer-status');
     if (data.count === 0) {
         timerDiv.innerText = '';
     } else {
-        let sc = data.secondsLeft < 10 ? '0'+data.secondsLeft : data.secondsLeft;
+        let left = data.secondsLeft !== undefined ? data.secondsLeft : data.timer;
+        let sc = left < 10 ? '0'+left : left;
         timerDiv.innerText = `00:${sc}`;
     }
 });
@@ -540,11 +542,17 @@ function updateUI() {
             status.innerText = DICT[currentLang].status_thinking;
             statusText.innerText = DICT[currentLang].wait_move;
             pnl.style.opacity = '1';
-            if (c === myColor) document.getElementById('btn-resign').classList.remove('hidden');
+            if (c === myColor) {
+                document.getElementById('btn-resign').classList.remove('hidden');
+                document.getElementById('btn-exit-lobby').classList.remove('hidden');
+            }
         } else {
             status.innerText = DICT[currentLang].status_waiting;
             pnl.style.opacity = '0.8';
-            if (c === myColor) document.getElementById('btn-resign').classList.remove('hidden');
+            if (c === myColor) {
+                document.getElementById('btn-resign').classList.remove('hidden');
+                document.getElementById('btn-exit-lobby').classList.remove('hidden');
+            }
         }
     }
 
@@ -590,6 +598,17 @@ requestAnimationFrame(renderTimer);
 document.getElementById('btn-resign').addEventListener('click', () => {
     if (confirm(DICT[currentLang].resign_confirm)) {
         socket.emit('resign');
+    }
+});
+
+document.getElementById('btn-exit-lobby').addEventListener('click', () => {
+    if (game && !game.gameOver) {
+        if (confirm(DICT[currentLang].exit_confirm)) {
+            socket.emit('resign');
+            location.reload(); // Web versiyonunda reload en temizi
+        }
+    } else {
+        location.reload();
     }
 });
 
