@@ -15,6 +15,9 @@ class GameEngine {
         this.setupPieces();
         this.gameOver = false;
         this.winner = null;
+        this.lastMove = null;
+        this.teamMode = false;
+
     }
 
     createEmptyBoard() {
@@ -82,6 +85,13 @@ class GameEngine {
         }
     }
 
+    isAlly(c1, c2) {
+        if (!this.teamMode) return c1 === c2;
+        if ((c1==='white'&&c2==='black') || (c1==='black'&&c2==='white')) return true;
+        if ((c1==='blue'&&c2==='red') || (c1==='red'&&c2==='blue')) return true;
+        return c1 === c2;
+    }
+    
     getCurrentTurnColor() {
         return CHESS_COLORS[this.turnIndex];
     }
@@ -110,7 +120,7 @@ class GameEngine {
                 this.scores[attacker] += PIECE_VALUES.king;
             }
             
-            this.removePiecesOfColor(eliminatedColor);
+            // this.removePiecesOfColor(eliminatedColor); // Artık donduruyoruz
             
             // Re-evaluate win condition
             this.checkWinCondition();
@@ -133,19 +143,33 @@ class GameEngine {
     }
 
     checkWinCondition() {
-        let activeCount = 0;
-        let lastActive = null;
-        for (let c of CHESS_COLORS) {
-            if (this.activePlayers[c]) {
-                activeCount++;
-                lastActive = c;
+        if (this.teamMode) {
+            let team1 = this.activePlayers['white'] || this.activePlayers['black'];
+            let team2 = this.activePlayers['blue'] || this.activePlayers['red'];
+            if (team1 && !team2) {
+                this.gameOver = true;
+                this.winner = 'white'; // Represents Team 1
+            } else if (!team1 && team2) {
+                this.gameOver = true;
+                this.winner = 'blue'; // Represents Team 2
+            } else if (!team1 && !team2) {
+                this.gameOver = true;
             }
-        }
-        if (activeCount === 1) {
-            this.gameOver = true;
-            this.winner = lastActive;
-        } else if (activeCount === 0) {
-            this.gameOver = true; // Draw / everyone lost
+        } else {
+            let activeCount = 0;
+            let lastActive = null;
+            for (let c of CHESS_COLORS) {
+                if (this.activePlayers[c]) {
+                    activeCount++;
+                    lastActive = c;
+                }
+            }
+            if (activeCount === 1) {
+                this.gameOver = true;
+                this.winner = lastActive;
+            } else if (activeCount === 0) {
+                this.gameOver = true; // Draw / everyone lost
+            }
         }
     }
 
@@ -186,7 +210,7 @@ class GameEngine {
             if (!this.inBounds(nx, ny)) return false;
             let target = b[ny][nx].piece;
             if (target) {
-                if (canCapture && target.color !== color) {
+                if (canCapture && !this.isAlly(target.color, color)) {
                     moves.push({ x: nx, y: ny, capture: true });
                 }
                 return false; // Block sliding
@@ -228,7 +252,7 @@ class GameEngine {
                 for (let cap of captureOps) {
                     if (this.inBounds(x + cap.dx, y + cap.dy)) {
                         let t = b[y+cap.dy][x+cap.dx].piece;
-                        if (t && t.color !== color) {
+                        if (t && !this.isAlly(t.color, color)) {
                             addMoveIfValid(x + cap.dx, y + cap.dy, true, true);
                         }
                     }
@@ -301,7 +325,7 @@ class GameEngine {
 
         // Check if any opponent piece can hit king
         for (let c of CHESS_COLORS) {
-            if (c !== color && this.activePlayers[c]) {
+            if (!this.isAlly(c, color) && this.activePlayers[c]) {
                 for (let y = 0; y < 14; y++) {
                     for (let x = 0; x < 14; x++) {
                         if (this.inBounds(x, y)) {
@@ -343,7 +367,7 @@ class GameEngine {
         const kpos = this.findKing(color, b);
         if (!kpos) return null;
         for (let c of CHESS_COLORS) {
-            if (c !== color && this.activePlayers[c]) {
+            if (!this.isAlly(c, color) && this.activePlayers[c]) {
                 for (let y = 0; y < 14; y++) {
                     for (let x = 0; x < 14; x++) {
                         if (this.inBounds(x, y)) {
@@ -368,7 +392,9 @@ class GameEngine {
         
         // Add score if capturing something
         if (targetPiece) {
-            this.scores[piece.color] += PIECE_VALUES[targetPiece.type];
+            if (this.activePlayers[targetPiece.color]) {
+                this.scores[piece.color] += PIECE_VALUES[targetPiece.type];
+            }
         }
 
         this.board[ty][tx].piece = piece;
@@ -396,12 +422,13 @@ class GameEngine {
                 if (c !== piece.color) {
                     this.scores[piece.color] += PIECE_VALUES.king; // Son taşı yiyene ödül
                 }
-                this.removePiecesOfColor(c);
+                // this.removePiecesOfColor(c); // Artık donduruyoruz
                 this.checkWinCondition();
             }
         }
 
         // Complete the turn automatically if not Game Over logic
+        this.lastMove = { fx, fy, tx, ty };
         this.nextTurn();
         return { success: true, promoted };
     }
@@ -470,7 +497,7 @@ class GameEngine {
                 for (let x2 = 0; x2 < 14; x2++) {
                     if (this.inBounds(x2, y2)) {
                         let op = nextB[y2][x2].piece;
-                        if (op && op.color !== color && this.activePlayers[op.color]) {
+                        if (op && !this.isAlly(op.color, color) && this.activePlayers[op.color]) {
                             let opMoves = this.getRawMoves(x2, y2, nextB);
                             if (opMoves.some(m => m.x === move.tx && m.y === move.ty)) {
                                 inDanger = true;

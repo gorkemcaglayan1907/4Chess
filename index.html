@@ -18,15 +18,28 @@
     <!-- Sound Toggle Button -->
     <button id="mute-toggle-btn">🔊</button>
     
-    <!-- Login Screen -->
+    <!-- Login & Main Menu Screen -->
     <div id="login-screen">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 400px; width: 100%;">
             <h1 style="color:var(--color-blue); margin-bottom:5px;">4CHESS</h1>
-            <p>Destansı çok oyunculu oyuna katıl</p>
-            <input type="text" id="username-input" placeholder="Oyuncu Adınız" maxlength="15">
-            <select id="flag-select" style="width:100%; padding: 10px; margin-bottom: 20px; border-radius: 8px; font-weight: 600;">
-            </select>
-            <button id="btn-login" style="width:100%;">Giriş Yap</button>
+            <p style="margin-bottom:20px; color:#94a3b8;">Destansı çok oyunculu oyuna katıl</p>
+            
+            <input type="text" id="username-input" placeholder="Oyuncu Adınız" maxlength="15" style="margin-bottom: 10px;">
+            <select id="flag-select" style="width:100%; padding: 10px; margin-bottom: 20px; border-radius: 8px; font-weight: 600;"></select>
+            
+            <div id="menu-actions" style="display:flex; flex-direction:column; gap:10px;">
+                <button id="btn-quick-play" style="background-color: var(--color-blue);">Giriş Yap (Hızlı Oyna)</button>
+                <div style="display:flex; gap:10px;">
+                    <button id="btn-create-room" style="background-color: var(--color-red); flex:1;">Oda Kur</button>
+                    <button id="btn-join-room-prompt" style="background-color: var(--board-dark); flex:1;">Odaya Katıl</button>
+                </div>
+                <button id="btn-leaderboard" style="background-color: #eab308; color: #000;">🏆 Liderlik Tablosu</button>
+            </div>
+            
+            <div id="join-room-container" class="hidden" style="margin-top:20px; padding-top:20px; border-top:1px solid var(--glass-border);">
+                <input type="text" id="room-code-input" placeholder="Oda Kodu" maxlength="4" style="text-transform:uppercase; text-align:center; font-size:1.5rem; letter-spacing: 5px;">
+                <button id="btn-join-room" style="width:100%; margin-top:10px;">Bağlan</button>
+            </div>
         </div>
     </div>
 
@@ -43,10 +56,13 @@
 
     <!-- Match interface -->
     <div id="game-container" class="hidden">
-        <div id="turn-indicator-wrapper" style="text-align: center; margin-bottom: 20px; z-index: 50; position: relative;">
-            <h2 id="turn-indicator">Sıra: Beyaz</h2>
-            <p id="game-status-text">Oyun bekleniyor...</p>
-            <div id="turn-timer-visual" style="font-size: 1.5rem; font-weight: 800; color: #f59e0b; margin-top: 5px;"></div>
+        <div id="turn-indicator-wrapper" style="text-align: center; margin-bottom: 20px; z-index: 50; position: relative; display:flex; justify-content:center; align-items:center; gap: 15px;">
+            <div>
+                <h2 id="turn-indicator">Sıra: Beyaz</h2>
+                <p id="game-status-text">Oyun bekleniyor...</p>
+                <div id="turn-timer-visual" style="font-size: 1.5rem; font-weight: 800; color: #f59e0b; margin-top: 5px;"></div>
+            </div>
+            <button id="btn-resign" style="background:var(--color-red); color:var(--color-white); border:none; padding: 10px 15px; border-radius:8px; font-weight:800; cursor:pointer;" class="hidden">🏳️ Pes Et</button>
         </div>
 
         <div id="board-wrapper">
@@ -102,6 +118,17 @@
         </div>
     </div>
 
+
+    <!-- Leaderboard Modal -->
+    <div id="leaderboard-modal" class="hidden">
+        <div class="modal-content" style="max-width: 400px; width: 100%;">
+            <h2 style="color: #eab308; margin-bottom: 20px;">🏆 Liderler Sıralaması</h2>
+            <div id="leaderboard-list" style="max-height: 300px; overflow-y: auto; text-align: left; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 8px;">
+                Yükleniyor...
+            </div>
+            <button id="btn-close-leaderboard" style="width: 100%; margin-top: 15px; background: var(--board-dark);">Kapat</button>
+        </div>
+    </div>
     <script src="/socket.io/socket.io.js"></script>
     <script src="engine.js?v=6"></script>
     <script src="ui.js?v=6"></script>

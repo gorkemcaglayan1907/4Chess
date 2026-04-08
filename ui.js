@@ -76,19 +76,55 @@ if (savedFlag) {
     flagSelect.value = savedFlag;
 }
 
-document.getElementById('btn-login').addEventListener('click', () => {
-    let name = usernameInput.value;
+function getNameAndFlag() {
+    let name = usernameInput.value.trim();
+    if (name === '') name = 'İsimsiz' + Math.floor(Math.random()*100);
     let flag = flagSelect.value;
-    if (name.trim() === '') name = 'İsimsiz' + Math.floor(Math.random()*100);
-    
-    // İsmi kalıcı olarak cihaz hafızasına ('Hesap' gibi) kaydet
-    localStorage.setItem('4chess_username', name.trim());
+    localStorage.setItem('4chess_username', name);
     localStorage.setItem('4chess_flag', flag);
-    
+    return { name, flag };
+}
+
+document.getElementById('btn-quick-play').addEventListener('click', () => {
+    let credentials = getNameAndFlag();
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('lobby-screen').classList.remove('hidden');
-    
-    socket.emit('join_queue', { username: name, flag: flag });
+    socket.emit('join_queue', { username: credentials.name, flag: credentials.flag });
+});
+
+document.getElementById('btn-create-room').addEventListener('click', () => {
+    let credentials = getNameAndFlag();
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('lobby-screen').classList.remove('hidden');
+    credentials.teamMode = document.getElementById('chk-team-mode').checked;
+    socket.emit('create_room', credentials);
+});
+
+document.getElementById('btn-join-room-prompt').addEventListener('click', () => {
+    document.getElementById('join-room-container').classList.toggle('hidden');
+});
+
+document.getElementById('btn-join-room').addEventListener('click', () => {
+    let code = document.getElementById('room-code-input').value.trim();
+    if(code.length === 4) {
+        let credentials = getNameAndFlag();
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('lobby-screen').classList.remove('hidden');
+        socket.emit('join_room', { code: code, ...credentials });
+    } else {
+        alert("Geçersiz Oda Kodu!");
+    }
+});
+
+socket.on('custom_room_joined', (data) => {
+    document.getElementById('queue-status').innerText = `Oda: ${data.code} | Oyuncular: ${data.count} / 4`;
+    document.getElementById('timer-status').innerText = 'Bekleniyor...';
+});
+
+socket.on('room_error', (msg) => {
+    alert(msg);
+    document.getElementById('lobby-screen').classList.add('hidden');
+    document.getElementById('login-screen').classList.remove('hidden');
 });
 
 socket.on('queue_update', (data) => {
@@ -147,6 +183,11 @@ function syncState(state) {
     playerNamesMap = state.playerNames;
     playerFlagsMap = state.playerFlags || {};
     turnEndTime = state.turnEndTime || 0;
+    game.teamMode = state.teamMode || false;
+    
+    if (state.lastMove !== undefined) {
+        game.lastMove = state.lastMove;
+    }
     
     selectedCell = null;
     validMovesForSelected = [];
@@ -264,6 +305,12 @@ function updateUI() {
             }
         }
     }
+    
+    if (game.lastMove) {
+        let lm = game.lastMove;
+        if (inBounds(lm.fx, lm.fy)) cellsDOM[lm.fy][lm.fx].classList.add('last-move');
+        if (inBounds(lm.tx, lm.ty)) cellsDOM[lm.ty][lm.tx].classList.add('last-move');
+    }
 
     let deletedCount = 0;
     let allPiecesDOM = document.querySelectorAll('.piece');
@@ -322,20 +369,23 @@ function updateUI() {
         if (!game.activePlayers[c]) {
             status.innerText = "Elendi";
             pnl.style.opacity = '0.4';
+            if (c === myColor) document.getElementById('btn-resign').classList.add('hidden');
         } else if (currentTurn === c) {
             pnl.classList.add('active-panel');
             status.innerText = "Düşünüyor...";
             statusText.innerText = "Hamle bekleniyor";
             pnl.style.opacity = '1';
+            if (c === myColor) document.getElementById('btn-resign').classList.remove('hidden');
         } else {
             status.innerText = "Bekliyor";
             pnl.style.opacity = '0.8';
+            if (c === myColor) document.getElementById('btn-resign').classList.remove('hidden');
         }
     }
 
     if (game.gameOver) {
         let w = game.winner;
-        let text = w ? `Kazanan: ${playerNamesMap[w]}!` : "Berabere!";
+        let text = w ? (game.teamMode ? (w==='white' ? 'Kazanan: Beyaz/Siyah Takımı!' : 'Kazanan: Mavi/Kırmızı Takımı!') : `Kazanan: ${playerNamesMap[w]}!`) : "Berabere!";
         document.getElementById('winner-text').innerText = text;
         document.getElementById('game-over-modal').classList.remove('hidden');
         statusText.innerText = "Oyun Bitti";
@@ -371,6 +421,12 @@ function renderTimer() {
     requestAnimationFrame(renderTimer);
 }
 requestAnimationFrame(renderTimer);
+
+document.getElementById('btn-resign').addEventListener('click', () => {
+    if (confirm("Gerçekten pes etmek ve çekilmek istiyor musunuz? Müttefikiniz zor durumda kalabilir!")) {
+        socket.emit('resign');
+    }
+});
 
 // CHAT SYSTEM LOGIC
 const chatWidget = document.getElementById('chat-widget');
@@ -424,4 +480,34 @@ socket.on('chat_msg', (data) => {
     
     // Scroll to bottom
     chatMessages.scrollTop = chatMessages.scrollHeight;
+});
+
+
+document.getElementById('btn-leaderboard').addEventListener('click', () => {
+    socket.emit('get_leaderboard');
+});
+
+socket.on('leaderboard_res', (list) => {
+    let div = document.getElementById('leaderboard-list');
+    div.innerHTML = '';
+    if (list.length === 0) {
+        div.innerHTML = '<div style="text-align:center; color:#94a3b8;">Henüz kimse şampiyon olmadı.</div>';
+    } else {
+        list.forEach((item, index) => {
+            let row = document.createElement('div');
+            row.style.padding = "8px";
+            row.style.borderBottom = "1px solid rgba(255,255,255,0.1)";
+            row.style.display = "flex";
+            row.style.justifyContent = "space-between";
+            
+            let pos = index === 0 ? "🥇" : (index === 1 ? "🥈" : (index === 2 ? "🥉" : (index+1)+"." ));
+            row.innerHTML = '<span><strong style="color:#eab308; margin-right:5px;">'+pos+'</strong> ' + item.name + '</span><span style="font-weight:bold; color:var(--board-light);">'+item.score+'</span>';
+            div.appendChild(row);
+        });
+    }
+    document.getElementById('leaderboard-modal').classList.remove('hidden');
+});
+
+document.getElementById('btn-close-leaderboard').addEventListener('click', () => {
+    document.getElementById('leaderboard-modal').classList.add('hidden');
 });
