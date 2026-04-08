@@ -122,6 +122,7 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
+    margin: 90px 40px; /* Add margin to create physical space for absolute panels outside */
 }
 
 #chess-board {

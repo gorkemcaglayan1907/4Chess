@@ -61,11 +61,11 @@ function processQueue(forceStart = false) {
 
         // Botlara otomatik bayrak
         let botCount = 1;
+        const validBotFlags = ['tr', 'us', 'gb', 'de', 'jp', 'kr'];
         availableColors.forEach(botColor => {
             bots.push(botColor);
             playerNames[botColor] = "Zorlu Bot " + botCount;
-            // Botlara özel bayrak kombinasyonu
-            playerFlags[botColor] = BOT_FLAGS[Math.floor(Math.random() * BOT_FLAGS.length)] || 'un';
+            playerFlags[botColor] = validBotFlags[Math.floor(Math.random() * validBotFlags.length)];
             botCount++;
         });
 
