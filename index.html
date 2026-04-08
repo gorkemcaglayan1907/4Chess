@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -11,15 +11,11 @@
     <!-- Landscape Orientation Warning -->
     <div id="landscape-warning">
         <div style="font-size: 3rem; margin-bottom:10px;">🔄</div>
-        Lütfen Telefonunuzu Yatay Döndürün
-        <p style="font-size: 1rem; color: #94a3b8; font-weight: normal; margin-top: 10px;">En iyi oyun deneyimi için cihazınız yan konumda olmalıdır.</p>
+        Please Rotate Your Device
+        <p style="font-size: 1rem; color: #94a3b8; font-weight: normal; margin-top: 10px;">For the best experience, please hold your device horizontally.</p>
     </div>
     
-    <!-- Language Toggle -->
-    <select id="lang-toggle-btn" style="position:fixed; top:15px; left:15px; z-index:1000; background:var(--board-dark); border:1px solid var(--glass-border); color:white; padding:5px; border-radius:5px; font-weight:bold; cursor:pointer; outline:none;">
-        <option value="en">🇬🇧 EN</option>
-        <option value="tr">🇹🇷 TR</option>
-    </select>
+    <!-- Language Toggle Removed - English Only -->
     
     <!-- Sound Toggle Button -->
     <button id="mute-toggle-btn">🔊</button>
@@ -28,23 +24,23 @@
     <div id="login-screen">
         <div class="modal-content" style="max-width: 400px; width: 100%;">
             <h1 style="color:var(--color-blue); margin-bottom:5px;">4CHESS</h1>
-            <p style="margin-bottom:20px; color:#94a3b8;">Destansı çok oyunculu oyuna katıl</p>
+            <p style="margin-bottom:20px; color:#94a3b8;">Join the epic multiplayer chess experience</p>
             
-            <input type="text" id="username-input" placeholder="Oyuncu Adınız" maxlength="15" style="margin-bottom: 10px;">
+            <input type="text" id="username-input" placeholder="Your Player Name" maxlength="15" style="margin-bottom: 10px;">
             <select id="flag-select" style="width:100%; padding: 10px; margin-bottom: 20px; border-radius: 8px; font-weight: 600;"></select>
             
             <div id="menu-actions" style="display:flex; flex-direction:column; gap:10px;">
-                <button id="btn-quick-play" style="background-color: var(--color-blue);">Giriş Yap (Hızlı Oyna)</button>
+                <button id="btn-quick-play" style="background-color: var(--color-blue);">Quick Play</button>
                 <div style="display:flex; gap:10px;">
-                    <button id="btn-create-room" style="background-color: var(--color-red); flex:1;">Oda Kur</button>
-                    <button id="btn-join-room-prompt" style="background-color: var(--board-dark); flex:1;">Odaya Katıl</button>
+                    <button id="btn-create-room" style="background-color: var(--color-red); flex:1;">Create Room</button>
+                    <button id="btn-join-room-prompt" style="background-color: var(--board-dark); flex:1;">Join Room</button>
                 </div>
-                <button id="btn-leaderboard" style="background-color: #eab308; color: #000;">🏆 Liderlik Tablosu</button>
+                <button id="btn-leaderboard" style="background-color: #eab308; color: #000;">🏆 Leaderboard</button>
             </div>
             
             <div id="join-room-container" class="hidden" style="margin-top:20px; padding-top:20px; border-top:1px solid var(--glass-border);">
-                <input type="text" id="room-code-input" placeholder="Oda Kodu" maxlength="4" style="text-transform:uppercase; text-align:center; font-size:1.5rem; letter-spacing: 5px;">
-                <button id="btn-join-room" style="width:100%; margin-top:10px;">Bağlan</button>
+                <input type="text" id="room-code-input" placeholder="Room Code" maxlength="4" style="text-transform:uppercase; text-align:center; font-size:1.5rem; letter-spacing: 5px;">
+                <button id="btn-join-room" style="width:100%; margin-top:10px;">Connect</button>
             </div>
         </div>
     </div>
@@ -52,11 +48,11 @@
     <!-- Matchmaking/Lobby Screen -->
     <div id="lobby-screen" class="hidden">
         <div class="modal-content">
-            <h2>Eşleştirme Bekleniyor 🔍</h2>
-            <div id="queue-status" style="font-size:1.2rem; font-weight:600; color:var(--board-light);">Bağlanılıyor...</div>
-            <div id="timer-status" style="font-size:2rem; font-weight:800; color:var(--color-red); margin-top:10px;">15sn</div>
+            <h2>Waiting for Players 🔍</h2>
+            <div id="queue-status" style="font-size:1.2rem; font-weight:600; color:var(--board-light);">Connecting...</div>
+            <div id="timer-status" style="font-size:2rem; font-weight:800; color:var(--color-red); margin-top:10px;">15s</div>
             <div class="spinner"></div>
-            <p class="small-text" style="color:#64748b; margin-top:20px; font-size:0.85rem;">Süre dolduğunda boş koltuklara botlar eklenecek.</p>
+            <p class="small-text" style="color:#64748b; margin-top:20px; font-size:0.85rem;">Bots will take empty seats when time's up.</p>
         </div>
     </div>
 
@@ -64,13 +60,13 @@
     <div id="game-container" class="hidden">
         <div id="turn-indicator-wrapper" style="text-align: center; margin-bottom: 20px; z-index: 50; position: relative; display:flex; justify-content:center; align-items:center; gap: 15px;">
             <div>
-                <h2 id="turn-indicator">Sıra: Beyaz</h2>
-                <p id="game-status-text">Oyun bekleniyor...</p>
+                <h2 id="turn-indicator">Turn: White</h2>
+                <p id="game-status-text">Waiting for game...</p>
                 <div id="turn-timer-visual" style="font-size: 1.5rem; font-weight: 800; color: #f59e0b; margin-top: 5px;"></div>
             </div>
             <div style="display:flex; flex-direction:column; gap:5px;">
-                <button id="btn-resign" style="background:var(--color-red); color:var(--color-white); border:none; padding: 10px 15px; border-radius:8px; font-weight:800; cursor:pointer;" class="hidden">🏳️ Pes Et</button>
-                <button id="btn-exit-lobby" style="background:var(--board-dark); color:var(--color-white); border:none; padding: 10px 15px; border-radius:8px; font-weight:800; cursor:pointer;" class="hidden">🏠 Ana Menü</button>
+                <button id="btn-resign" style="background:var(--color-red); color:var(--color-white); border:none; padding: 10px 15px; border-radius:8px; font-weight:800; cursor:pointer;" class="hidden">🏳️ Resign</button>
+                <button id="btn-exit-lobby" style="background:var(--board-dark); color:var(--color-white); border:none; padding: 10px 15px; border-radius:8px; font-weight:800; cursor:pointer;" class="hidden">🏠 Home</button>
             </div>
         </div>
 
@@ -106,24 +102,24 @@
 
     <div id="game-over-modal" class="hidden">
         <div class="modal-content">
-            <h2 id="winner-text">Oyun Bitti!</h2>
-            <p>Oda süresi doldu veya kazanan belirlendi. Lütfen lobiden tekrar eşleşin.</p>
+            <h2 id="winner-text">Game Over!</h2>
+            <p>Room expired or a winner has been decided. Please rejoin via lobby.</p>
         </div>
     </div>
 
     <!-- Mobile Chat Toggle Button -->
-    <button id="chat-toggle-btn">💬 Sohbet</button>
+    <button id="chat-toggle-btn">💬 Chat</button>
 
     <!-- Chat UI -->
     <div id="chat-widget">
         <div id="chat-header">
-            Oyun Sohbeti
+            Game Chat
             <span id="chat-close-btn" style="position:absolute; right:15px; cursor:pointer; font-size:1.2rem; display:none;">✕</span>
         </div>
         <div id="chat-messages"></div>
         <div id="chat-input-area">
-            <input type="text" id="chat-input" placeholder="Mesajınız..." maxlength="60">
-            <button id="btn-send-chat">Gönder</button>
+            <input type="text" id="chat-input" placeholder="Type a message..." maxlength="60">
+            <button id="btn-send-chat">Send</button>
         </div>
     </div>
 
@@ -131,11 +127,11 @@
     <!-- Leaderboard Modal -->
     <div id="leaderboard-modal" class="hidden">
         <div class="modal-content" style="max-width: 400px; width: 100%;">
-            <h2 style="color: #eab308; margin-bottom: 20px;">🏆 Liderler Sıralaması</h2>
+            <h2 style="color: #eab308; margin-bottom: 20px;">🏆 Leaderboard</h2>
             <div id="leaderboard-list" style="max-height: 300px; overflow-y: auto; text-align: left; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 8px;">
-                Yükleniyor...
+                Loading...
             </div>
-            <button id="btn-close-leaderboard" style="width: 100%; margin-top: 15px; background: var(--board-dark);">Kapat</button>
+            <button id="btn-close-leaderboard" style="width: 100%; margin-top: 15px; background: var(--board-dark);">Close</button>
         </div>
     </div>
     <script src="/socket.io/socket.io.js"></script>

@@ -1,10 +1,7 @@
 const socket = io();
 
-const audioMove = new Audio('https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/move-self.mp3');
-const audioCapture = new Audio('https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/capture.mp3');
-const audioEnd = new Audio('https://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/game-end.mp3');
-
-let soundEnabled = true;
+// Sound logic removed as per user request
+let currentRoomId = null;
 
 const DICT = {
     en: {
@@ -23,7 +20,7 @@ const DICT = {
         queue_connecting: "Connecting...",
         bot_info: "Bots will fill empty seats when time runs out.",
         chat_title: "Game Chat",
-        chat_placeholder: "Message...",
+        chat_placeholder: "Type a message...",
         btn_send: "Send",
         btn_resign: "🏳️ Resign",
         btn_close: "Close",
@@ -46,58 +43,15 @@ const DICT = {
         colors: { white: 'Green', blue: 'Blue', black: 'Black', red: 'Red' },
         
         resign_confirm: "Are you sure you want to resign? Your ally might be left alone!",
+        exit_confirm: "Are you sure you want to exit? Your place will be taken by a bot!",
         err_code: "Invalid Room Code!",
         room_txt: "Room: ",
         room_wait: "Waiting..."
-    },
-    tr: {
-        warn_landscape: "Lütfen Telefonunuzu Yatay Döndürün",
-        warn_sub: "En iyi oyun deneyimi için cihazınız yan konumda olmalıdır.",
-        title_sub: "Destansı çok oyunculu oyuna katıl",
-        placeholder_name: "Oyuncu Adınız",
-        btn_quick: "Giriş Yap (Hızlı Oyna)",
-        btn_create: "Oda Kur",
-        btn_join_prompt: "Odaya Katıl",
-        btn_leaderboard: "🏆 Liderlik Tablosu",
-        placeholder_code: "Oda Kodu",
-        btn_join: "Bağlan",
-        team_mode_txt: "2v2 Takım (Beyaz&Siyah vs Mavi&Kırmızı) Sadece Özel Odalar için",
-        lobby_title: "Eşleştirme Bekleniyor 🔍",
-        queue_connecting: "Bağlanılıyor...",
-        bot_info: "Süre dolduğunda boş koltuklara botlar eklenecek.",
-        chat_title: "Oyun Sohbeti",
-        chat_placeholder: "Mesajınız...",
-        btn_send: "Gönder",
-        btn_resign: "🏳️ Pes Et",
-        btn_close: "Kapat",
-        leaderboard_empty: "Henüz kimse şampiyon olmadı.",
-        leaderboard_title: "🏆 Liderler Sıralaması",
-        
-        status_eliminated: "Elendi",
-        status_thinking: "Düşünüyor...",
-        status_waiting: "Bekliyor",
-        status_game_over: "Oyun Bitti",
-        turn: "Sıra: ",
-        points: "Puan: ",
-        draw: "Berabere!",
-        wait_move: "Hamle bekleniyor",
-        
-        win_wb: "Kazanan: Beyaz/Siyah Takımı!",
-        win_br: "Kazanan: Mavi/Kırmızı Takımı!",
-        win_p: "Kazanan: ",
-        
-        colors: { white: 'Yeşil', blue: 'Mavi', black: 'Siyah', red: 'Kırmızı' },
-        
-        resign_confirm: "Hamle sıranızı Yapay Zeka devralacak. Emin misiniz?",
-        exit_confirm: "Ana menüye dönerseniz pes etmiş sayılacaksınız ve yerinizi bot alacak. Emin misiniz?",
-        err_code: "Geçersiz Oda Kodu!",
-        room_txt: "Oda: ",
-        room_wait: DICT[currentLang].room_wait
     }
 };
 
-let currentLang = localStorage.getItem('4chess_lang') || 'en';
-let TR_COLORS = DICT[currentLang].colors; // update immediately
+let currentLang = 'en';
+let TR_COLORS = DICT[currentLang].colors;
 
 function executeI18N() {
     let d = DICT[currentLang];
@@ -153,16 +107,7 @@ function executeI18N() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-    let ls = document.getElementById('lang-toggle-btn');
-    if(ls) {
-        ls.value = currentLang;
-        ls.addEventListener('change', (e) => {
-            currentLang = e.target.value;
-            localStorage.setItem('4chess_lang', currentLang);
-            executeI18N();
-        });
-        executeI18N();
-    }
+    executeI18N();
 });
 
 
@@ -185,22 +130,22 @@ let boardRotation = 0;
 let panelMap = { white: 'bottom', black: 'top', blue: 'left', red: 'right' };
 
 const ALL_FLAGS = [
-    {code: 'tr', name: 'Türkiye'}, {code: 'az', name: 'Azerbaycan'}, {code: 'us', name: 'ABD'},
-    {code: 'de', name: 'Almanya'}, {code: 'ar', name: 'Arjantin'}, {code: 'au', name: 'Avustralya'},
-    {code: 'at', name: 'Avusturya'}, {code: 'ae', name: 'BAE'}, {code: 'be', name: 'Belçika'}, 
-    {code: 'gb', name: 'Birleşik Krallık'}, {code: 'br', name: 'Brezilya'}, {code: 'bg', name: 'Bulgaristan'}, 
-    {code: 'dz', name: 'Cezayir'}, {code: 'cn', name: 'Çin'}, {code: 'dk', name: 'Danimarka'}, 
-    {code: 'id', name: 'Endonezya'}, {code: 'ma', name: 'Fas'}, {code: 'ps', name: 'Filistin'}, 
-    {code: 'fi', name: 'Finlandiya'}, {code: 'fr', name: 'Fransa'}, {code: 'za', name: 'Güney Afrika'}, 
-    {code: 'kr', name: 'Güney Kore'}, {code: 'in', name: 'Hindistan'}, {code: 'nl', name: 'Hollanda'}, 
-    {code: 'iq', name: 'Irak'}, {code: 'ir', name: 'İran'}, {code: 'es', name: 'İspanya'}, 
-    {code: 'se', name: 'İsveç'}, {code: 'ch', name: 'İsviçre'}, {code: 'it', name: 'İtalya'}, 
-    {code: 'jp', name: 'Japonya'}, {code: 'ca', name: 'Kanada'}, {code: 'kz', name: 'Kazakistan'}, 
-    {code: 'my', name: 'Malezya'}, {code: 'mx', name: 'Meksika'}, {code: 'eg', name: 'Mısır'}, 
-    {code: 'no', name: 'Norveç'}, {code: 'pk', name: 'Pakistan'}, {code: 'pl', name: 'Polonya'}, 
-    {code: 'ro', name: 'Romanya'}, {code: 'ru', name: 'Rusya'}, {code: 'sg', name: 'Singapur'}, 
-    {code: 'sy', name: 'Suriye'}, {code: 'sa', name: 'Suudi Arabistan'}, {code: 'ua', name: 'Ukrayna'}, 
-    {code: 'gr', name: 'Yunanistan'}
+    {code: 'tr', name: 'Turkey'}, {code: 'az', name: 'Azerbaijan'}, {code: 'us', name: 'USA'},
+    {code: 'de', name: 'Germany'}, {code: 'ar', name: 'Argentina'}, {code: 'au', name: 'Australia'},
+    {code: 'at', name: 'Austria'}, {code: 'ae', name: 'UAE'}, {code: 'be', name: 'Belgium'}, 
+    {code: 'gb', name: 'United Kingdom'}, {code: 'br', name: 'Brazil'}, {code: 'bg', name: 'Bulgaria'}, 
+    {code: 'dz', name: 'Algeria'}, {code: 'cn', name: 'China'}, {code: 'dk', name: 'Denmark'}, 
+    {code: 'id', name: 'Indonesia'}, {code: 'ma', name: 'Morocco'}, {code: 'ps', name: 'Palestine'}, 
+    {code: 'fi', name: 'Finland'}, {code: 'fr', name: 'France'}, {code: 'za', name: 'South Africa'}, 
+    {code: 'kr', name: 'South Korea'}, {code: 'in', name: 'India'}, {code: 'nl', name: 'Netherlands'}, 
+    {code: 'iq', name: 'Iraq'}, {code: 'ir', name: 'Iran'}, {code: 'es', name: 'Spain'}, 
+    {code: 'se', name: 'Sweden'}, {code: 'ch', name: 'Switzerland'}, {code: 'it', name: 'Italy'}, 
+    {code: 'jp', name: 'Japan'}, {code: 'ca', name: 'Canada'}, {code: 'kz', name: 'Kazakhstan'}, 
+    {code: 'my', name: 'Malaysia'}, {code: 'mx', name: 'Mexico'}, {code: 'eg', name: 'Egypt'}, 
+    {code: 'no', name: 'Norway'}, {code: 'pk', name: 'Pakistan'}, {code: 'pl', name: 'Poland'}, 
+    {code: 'ro', name: 'Romania'}, {code: 'ru', name: 'Russia'}, {code: 'sg', name: 'Singapore'}, 
+    {code: 'sy', name: 'Syria'}, {code: 'sa', name: 'Saudi Arabia'}, {code: 'ua', name: 'Ukraine'}, 
+    {code: 'gr', name: 'Greece'}
 ];
 
 function getFlagEmoji(countryCode) {
@@ -236,7 +181,7 @@ if (savedFlag) {
 
 function getNameAndFlag() {
     let name = usernameInput.value.trim();
-    if (name === '') name = 'İsimsiz' + Math.floor(Math.random()*100);
+    if (name === '') name = 'Unnamed' + Math.floor(Math.random()*100);
     let flag = flagSelect.value;
     localStorage.setItem('4chess_username', name);
     localStorage.setItem('4chess_flag', flag);
@@ -276,7 +221,7 @@ document.getElementById('btn-join-room').addEventListener('click', () => {
 
 socket.on('custom_room_joined', (data) => {
     document.getElementById('queue-status').innerText = `${DICT[currentLang].room_txt}${data.code} | ${data.count} / 4`;
-    document.getElementById('timer-status').innerText = 'Bekleniyor...';
+    document.getElementById('timer-status').innerText = 'Waiting...';
 });
 
 socket.on('room_error', (msg) => {
@@ -286,7 +231,7 @@ socket.on('room_error', (msg) => {
 });
 
 socket.on('queue_update', (data) => {
-    document.getElementById('queue-status').innerText = `Sıra Bekleniyor: ${data.count} / ${data.max}`;
+    document.getElementById('queue-status').innerText = `Waiting for Players: ${data.count} / ${data.max}`;
     let timerDiv = document.getElementById('timer-status');
     if (data.count === 0) {
         timerDiv.innerText = '';
@@ -299,9 +244,9 @@ socket.on('queue_update', (data) => {
 
 socket.on('match_found', (data) => {
     myColor = data.color;
-    document.getElementById('lobby-screen').classList.add('hidden');
     document.getElementById('game-container').classList.remove('hidden');
     document.title = `4CHESS - ${TR_COLORS[myColor]}`;
+    currentRoomId = data.roomId; // Oda kimliğini kaydet
     
     if (myColor === 'white' || !myColor) {
         boardRotation = 0;
@@ -322,6 +267,7 @@ socket.on('match_found', (data) => {
 });
 
 socket.on('init_state', (state) => {
+    if (state.roomId && state.roomId !== currentRoomId) return; // Filtrele
     game = state; 
     playerNamesMap = state.playerNames;
     playerFlagsMap = state.playerFlags || {};
@@ -329,6 +275,7 @@ socket.on('init_state', (state) => {
 });
 
 socket.on('state_update', (state) => {
+    if (state.roomId && state.roomId !== currentRoomId) return; // Filtrele
     syncState(state);
 });
 
@@ -339,10 +286,10 @@ function syncState(state) {
     game.activePlayers = state.activePlayers;
     game.gameOver = state.gameOver;
     game.winner = state.winner;
-    playerNamesMap = state.playerNames;
-    playerFlagsMap = state.playerFlags || {};
-    turnEndTime = state.turnEndTime || 0;
-    game.teamMode = state.teamMode || false;
+    if (state.playerNames) playerNamesMap = state.playerNames;
+    if (state.playerFlags) playerFlagsMap = state.playerFlags || {};
+    if (state.turnEndTime !== undefined) turnEndTime = state.turnEndTime || 0;
+    if (state.teamMode !== undefined) game.teamMode = state.teamMode || false;
     
     if (state.lastMove !== undefined) {
         game.lastMove = state.lastMove;
@@ -564,10 +511,7 @@ function updateUI() {
         statusText.innerText = DICT[currentLang].status_game_over;
         
         if (window.lastGameOver !== true) {
-            if (soundEnabled) {
-                audioEnd.currentTime = 0;
-                audioEnd.play().catch(e => {});
-            }
+            // Sound playback removed as per user request
             window.lastGameOver = true;
         }
     }
@@ -587,7 +531,7 @@ function renderTimer() {
             turnTimerDOM.style.transform = 'scale(1)';
         }
         
-        turnTimerDOM.innerText = `⏳ ${secs} saniye`;
+        turnTimerDOM.innerText = `⏳ ${secs} seconds`;
     } else if (turnTimerDOM) {
         turnTimerDOM.innerText = '';
     }
@@ -626,14 +570,7 @@ document.getElementById('chat-close-btn').addEventListener('click', () => {
     chatWidget.classList.remove('chat-open');
 });
 
-// Sound Toggle Listener
-const muteBtn = document.getElementById('mute-toggle-btn');
-if (muteBtn) {
-    muteBtn.addEventListener('click', () => {
-        soundEnabled = !soundEnabled;
-        muteBtn.innerText = soundEnabled ? '🔊' : '🔇';
-    });
-}
+// Sound logic removed as per user request
 
 function sendChatMessage() {
     let text = chatInput.value.trim();
@@ -649,6 +586,7 @@ chatInput.addEventListener('keypress', (e) => {
 });
 
 socket.on('chat_msg', (data) => {
+    if (data.roomId && data.roomId !== currentRoomId) return; // Filtrele
     let entry = document.createElement('div');
     entry.className = 'chat-entry';
     let nameElem = document.createElement('strong');
@@ -675,7 +613,7 @@ socket.on('leaderboard_res', (list) => {
     let div = document.getElementById('leaderboard-list');
     div.innerHTML = '';
     if (list.length === 0) {
-        div.innerHTML = '<div style="text-align:center; color:#94a3b8;">Henüz kimse şampiyon olmadı.</div>';
+        div.innerHTML = '<div style="text-align:center; color:#94a3b8;">No champions yet.</div>';
     } else {
         list.forEach((item, index) => {
             let row = document.createElement('div');

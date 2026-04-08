@@ -21,8 +21,6 @@ function updateLeaderboard(name, points) {
     fs.writeFileSync('leaderboard.json', JSON.stringify(leaderboard));
 }
 
-
-
 app.use(express.static(__dirname));
 
 let waitingQueue = []; 
@@ -30,7 +28,8 @@ let queueTimeoutInterval = null;
 let secondsLeft = 15;
 
 let customRooms = {}; // { 'A1B2': { players: [], timeout: null } }
-const VALID_BOT_FLAGS = ['tr', 'us', 'gb', 'de', 'jp', 'kr', 'it', 'fr', 'es'];
+let leaverBans = {}; // { username: timestamp }
+const VALID_BOT_FLAGS = ['us', 'gb', 'de', 'jp', 'kr', 'it', 'fr', 'es'];
 
 function generateRoomCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -54,7 +53,6 @@ function processQueue(forceStart = false) {
     let isFull = waitingQueue.length >= 4;
     
     if (isFull || forceStart) {
-        // Zamanlayıcıyı durdur
         if (queueTimeoutInterval) {
             clearInterval(queueTimeoutInterval);
             queueTimeoutInterval = null;
@@ -75,8 +73,8 @@ function processQueue(forceStart = false) {
         playersInMatch.forEach((p) => {
             let assignedColor = availableColors.shift();
             players[p.socket.id] = assignedColor;
-            playerNames[assignedColor] = p.username || "Misafir";
-            playerFlags[assignedColor] = p.flag || "tr";
+            playerNames[assignedColor] = p.username || "Guest";
+            playerFlags[assignedColor] = p.flag || "us";
             userRooms[p.socket.id] = roomId;
             p.socket.join(roomId);
             
@@ -86,32 +84,31 @@ function processQueue(forceStart = false) {
             });
         });
 
-        // Botlara otomatik bayrak
+        // Bot default flags
         let botCount = 1;
-        const validBotFlags = ['tr', 'us', 'gb', 'de', 'jp', 'kr'];
+        const validBotFlags = ['us', 'gb', 'de', 'jp', 'kr'];
         availableColors.forEach(botColor => {
             bots.push(botColor);
-            playerNames[botColor] = "Zorlu Bot " + botCount;
+            playerNames[botColor] = "Master Bot " + botCount;
             playerFlags[botColor] = validBotFlags[Math.floor(Math.random() * validBotFlags.length)];
             botCount++;
         });
 
         rooms[roomId] = { game, players, playerNames, playerFlags, bots, turnTimer: null, turnEndTime: 0 };
         
-        secondsLeft = 15; // Sonraki sıra için reset
+        secondsLeft = 15;
         startTurnTimer(roomId);
         startGameLoop(roomId);
         
         if (waitingQueue.length > 0) processQueue();
     } else {
-        // Bekleyen sayısı 4 ten azsa Timer'i aktifleştir
         if (!queueTimeoutInterval && waitingQueue.length > 0) {
             secondsLeft = 15;
             queueTimeoutInterval = setInterval(() => {
                 secondsLeft--;
                 broadcastQueueUpdate();
                 if (secondsLeft <= 0) {
-                    processQueue(true); // Süre bitince zorla başlat
+                    processQueue(true);
                 }
             }, 1000);
         }
@@ -180,12 +177,20 @@ function broadcastRoomState(roomId, promoted = false) {
     if (room.game.gameOver && !room.savedScores) {
         room.savedScores = true;
         for(let c of CHESS_COLORS) {
-            if (!room.bots.includes(c) && room.playerNames[c] && !room.playerNames[c].startsWith("Misafir")) {
+            if (!room.bots.includes(c) && room.playerNames[c] && !room.playerNames[c].startsWith("Guest")) {
                  let pts = room.game.scores[c] || 0;
                  if (room.game.winner === c) pts += 50;
                  updateLeaderboard(room.playerNames[c], pts);
             }
         }
+        // Cleanup room after 5 minutes of inactivity if game is over
+        setTimeout(() => {
+            if (rooms[roomId] && rooms[roomId].game.gameOver) {
+                console.log(`[SERVER] Cleaning up finished room: ${roomId}`);
+                if (rooms[roomId].turnTimer) clearTimeout(rooms[roomId].turnTimer);
+                delete rooms[roomId];
+            }
+        }, 300000);
     }
 
     io.to(roomId).emit('state_update', {
@@ -195,13 +200,11 @@ function broadcastRoomState(roomId, promoted = false) {
         activePlayers: room.game.activePlayers,
         gameOver: room.game.gameOver,
         winner: room.game.winner,
-        playerNames: room.playerNames,
-        playerFlags: room.playerFlags,
         turnEndTime: room.turnEndTime,
-        teamMode: room.game.teamMode,
         serverTime: Date.now(),
         lastMove: room.game.lastMove,
-        promoted: promoted
+        promoted: promoted,
+        roomId: roomId
     });
 }
 
@@ -221,7 +224,8 @@ function startGameLoop(roomId) {
         turnEndTime: room.turnEndTime,
         teamMode: room.game.teamMode,
         serverTime: Date.now(),
-        lastMove: room.game.lastMove
+        lastMove: room.game.lastMove,
+        roomId: roomId
     });
     triggerBotMove(roomId);
 }
@@ -250,8 +254,8 @@ function processCustomRoom(code) {
     pList.forEach((p, index) => {
         let color = availableColors[index];
         players[p.socket.id] = color;
-        playerNames[color] = p.name || "Misafir";
-        playerFlags[color] = p.flag || 'tr';
+        playerNames[color] = p.name || "Guest";
+        playerFlags[color] = p.flag || 'us';
         userRooms[p.socket.id] = roomId;
         p.socket.join(roomId);
     });
@@ -260,7 +264,7 @@ function processCustomRoom(code) {
     for(let i = pList.length; i < 4; i++) {
         let botColor = availableColors[i];
         bots.push(botColor);
-        playerNames[botColor] = "Zorlu Bot " + botCount;
+        playerNames[botColor] = "Master Bot " + botCount;
         playerFlags[botColor] = VALID_BOT_FLAGS[Math.floor(Math.random() * VALID_BOT_FLAGS.length)];
         botCount++;
     }
@@ -277,51 +281,122 @@ function processCustomRoom(code) {
     delete customRooms[code];
 }
 
+function purgePlayer(socket) {
+    console.log(`[SERVER] Purging player: ${socket.id}`);
+    waitingQueue = waitingQueue.filter(p => p.socket.id !== socket.id);
+
+    let oldRoomId = userRooms[socket.id];
+    if (oldRoomId) {
+        if (rooms[oldRoomId]) {
+            let room = rooms[oldRoomId];
+            let color = room.players[socket.id];
+            if (color && !room.game.gameOver) {
+                let name = room.playerNames[color];
+                
+                // LEAVER PENALTY
+                if (name && !name.startsWith("Guest")) {
+                    updateLeaderboard(name, -100);
+                    leaverBans[name] = Date.now() + 180000; // 3 min ban
+                    socket.emit('ban_status', { bannedUntil: leaverBans[name] });
+                }
+
+                room.bots.push(color);
+                delete room.players[socket.id];
+
+                io.to(oldRoomId).emit('chat_msg', { 
+                    color: color, 
+                    name: 'System', 
+                    text: `${room.playerNames[color]} left the room, AI took over!`,
+                    roomId: oldRoomId
+                });
+
+                if (room.game.getCurrentTurnColor() === color) {
+                    triggerBotMove(oldRoomId);
+                }
+                broadcastRoomState(oldRoomId);
+
+                // If no more human players are left, cleanup room after 30 seconds
+                if (Object.keys(room.players).length === 0) {
+                    setTimeout(() => {
+                        if (rooms[oldRoomId] && Object.keys(rooms[oldRoomId].players).length === 0) {
+                            console.log(`[SERVER] Cleaning up empty room: ${oldRoomId}`);
+                            if (rooms[oldRoomId].turnTimer) clearTimeout(rooms[oldRoomId].turnTimer);
+                            delete rooms[oldRoomId];
+                        }
+                    }, 30000);
+                }
+            }
+        }
+        socket.rooms.forEach(room => {
+            if (room !== socket.id) socket.leave(room);
+        });
+        delete userRooms[socket.id];
+    }
+
+    for (let code in customRooms) {
+        customRooms[code].players = customRooms[code].players.filter(p => p.socket.id !== socket.id);
+        if (customRooms[code].players.length === 0) {
+            delete customRooms[code];
+        }
+    }
+}
+
 io.on('connection', (socket) => {
+    console.log(`[SERVER] New connection: ${socket.id}`);
     
     socket.on('get_leaderboard', () => {
         socket.emit('leaderboard_res', leaderboard.slice(0, 10));
     });
+
     socket.on('join_queue', (data) => {
-        let name = data.username.trim() || 'Misafir';
+        let name = data.username.trim() || 'Guest';
+        if (leaverBans[name] && leaverBans[name] > Date.now()) {
+            return socket.emit('room_error', `You are banned for ${Math.ceil((leaverBans[name] - Date.now()) / 1000)} more seconds.`);
+        }
+        purgePlayer(socket);
         if (name.length > 15) name = name.substring(0, 15);
-        waitingQueue.push({ socket, username: name, flag: data.flag || 'tr' });
+        waitingQueue.push({ socket, username: name, flag: data.flag || 'us' });
         processQueue();
     });
 
     socket.on('create_room', (data) => {
-        if (waitingQueue.some(p => p.socket.id === socket.id)) return;
-        
+        let name = data.name.trim() || 'Guest';
+        if (leaverBans[name] && leaverBans[name] > Date.now()) {
+            return socket.emit('room_error', `You are banned for ${Math.ceil((leaverBans[name] - Date.now()) / 1000)} more seconds.`);
+        }
+        purgePlayer(socket);
         let code = generateRoomCode();
         customRooms[code] = { teamMode: data.teamMode || false, players: [{ socket, name: data.name, flag: data.flag }] };
         socket.emit('custom_room_joined', { code, count: 1, names: [data.name] });
     });
 
     socket.on('join_room', (data) => {
+        let name = data.name.trim() || 'Guest';
+        if (leaverBans[name] && leaverBans[name] > Date.now()) {
+            return socket.emit('room_error', `You are banned for ${Math.ceil((leaverBans[name] - Date.now()) / 1000)} more seconds.`);
+        }
+        purgePlayer(socket);
         let code = data.code.toUpperCase();
         if (customRooms[code]) {
             if (customRooms[code].players.length < 4) {
                customRooms[code].players.push({ socket, name: data.name, flag: data.flag });
-               
                let names = customRooms[code].players.map(p => p.name);
                customRooms[code].players.forEach(p => {
                    p.socket.emit('custom_room_joined', { code, count: customRooms[code].players.length, names });
                });
-               
                if (customRooms[code].players.length === 4) {
                    processCustomRoom(code);
                }
             } else {
-               socket.emit('room_error', 'Oda zaten 4 kişi (Dolu).');
+               socket.emit('room_error', 'The room is already full (4/4).');
             }
         } else {
-            socket.emit('room_error', 'Böyle bir oda kodu bulunamadı.');
+            socket.emit('room_error', 'Room code not found.');
         }
     });
     
     socket.on('force_start_room', (code) => {
         if (customRooms[code]) {
-            // Sadece odada olan biri başlatabilir
             let isInside = customRooms[code].players.some(p => p.socket.id === socket.id);
             if (isInside) {
                 processCustomRoom(code);
@@ -350,28 +425,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('resign', () => {
-        let roomId = userRooms[socket.id];
-        let room = rooms[roomId];
-        if (!room || room.game.gameOver) return;
-
-        let color = room.players[socket.id];
-        if (color && room.game.activePlayers[color] && !room.bots.includes(color)) {
-            // Oyuncu pes ettiğinde taşları dondurmak yerine kontrolü Bota devrediyoruz
-            room.bots.push(color);
-            
-            io.to(roomId).emit('chat_msg', { 
-                color: color, 
-                name: 'Sistem', 
-                text: `${room.playerNames[color]} pes etti, yerine Yapay Zeka geçti!` 
-            });
-
-            broadcastRoomState(roomId);
-
-            // Eğer sıra pes eden oyuncudaysa Botu hemen tetikle
-            if (room.game.getCurrentTurnColor() === color) {
-                triggerBotMove(roomId);
-            }
-        }
+        purgePlayer(socket);
     });
 
     socket.on('chat_msg', (data) => {
@@ -383,17 +437,16 @@ io.on('connection', (socket) => {
         if (!color) return;
         
         let name = room.playerNames[color];
-        // Sadece odadakilere gönder
         io.to(roomId).emit('chat_msg', {
             color: color,
             name: name,
-            text: data.text.substring(0, 80) // Maks 80 karakter
+            text: data.text.substring(0, 80),
+            roomId: roomId
         });
     });
 
     socket.on('disconnect', () => {
         waitingQueue = waitingQueue.filter(p => p.socket.id !== socket.id);
-        
         if (waitingQueue.length === 0 && queueTimeoutInterval) {
              clearInterval(queueTimeoutInterval);
              queueTimeoutInterval = null;
@@ -405,11 +458,9 @@ io.on('connection', (socket) => {
         if (roomId && rooms[roomId]) {
             let room = rooms[roomId];
             let color = room.players[socket.id];
-            
             if (color && room.game.activePlayers[color] && !room.game.gameOver) {
                 room.bots.push(color);
                 delete room.players[socket.id];
-                
                 if (room.game.getCurrentTurnColor() === color) {
                     triggerBotMove(roomId);
                 }
