@@ -178,20 +178,22 @@ body {
 /* Mobile Media Query Overrides */
 @media (max-width: 768px) {
     #board-wrapper {
-        padding: 130px 0 60px 0;
+        padding: 110px 0 60px 0; /* Padding creates space inside the wrapper for the nameplates */
         width: 100%;
+        margin-top: 10px;
     }
     .screen-panel {
         pointer-events: none; /* Let touches pass through panels to pieces */
-        padding: 4px 10px;
-        min-width: 70px;
+        padding: 5px 10px;
+        border-radius: 6px;
     }
     .player-name { font-size: 0.9rem; max-width: 60px; }
     .player-score { font-size: 0.7rem; }
     
-    .panel-left { left: 5px; top: -45px; transform: none; flex-direction: row; gap: 5px; }
-    .panel-right { right: 5px; top: -45px; transform: none; flex-direction: row; gap: 5px; }
-    .panel-top { top: -105px; }
+    /* Place the nameplates positively inside the new 110px padding */
+    .panel-top { top: 10px; }
+    .panel-left { left: 5px; top: 55px; transform: none; flex-direction: row; gap: 5px; }
+    .panel-right { right: 5px; top: 55px; transform: none; flex-direction: row; gap: 5px; }
     .panel-bottom { bottom: 10px; }
     
     /* Hide status text on left/right for space */
