@@ -146,6 +146,24 @@ class GameEngine {
         }
     }
 
+    hasOnlyKing(color) {
+        let count = 0;
+        let hasKing = false;
+        for (let y = 0; y < 14; y++) {
+            for (let x = 0; x < 14; x++) {
+                if (this.inBounds(x, y)) {
+                    let p = this.board[y][x].piece;
+                    if (p && p.color === color) {
+                        count++;
+                        if (p.type === PIECES.KING) hasKing = true;
+                        if (count > 1) return false;
+                    }
+                }
+            }
+        }
+        return count === 1 && hasKing;
+    }
+
     getPieceAt(x, y, customBoard = null) {
         const b = customBoard || this.board;
         if (!this.inBounds(x, y)) return null;
@@ -365,6 +383,18 @@ class GameEngine {
             if (reachedEnd) {
                 piece.type = PIECES.QUEEN; // otomatik vezir
                 promoted = true;
+            }
+        }
+
+        // Yeni Kural: Sadece Şahı kalan oyuncuları anında ele.
+        for (let c of CHESS_COLORS) {
+            if (this.activePlayers[c] && this.hasOnlyKing(c)) {
+                this.activePlayers[c] = false;
+                if (c !== piece.color) {
+                    this.scores[piece.color] += PIECE_VALUES.king; // Son taşı yiyene ödül
+                }
+                this.removePiecesOfColor(c);
+                this.checkWinCondition();
             }
         }
 
