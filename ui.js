@@ -1,5 +1,10 @@
 const socket = io();
 
+const audioMove = new Audio('https://upload.wikimedia.org/wikipedia/commons/4/43/Chess_move.ogg');
+const audioCapture = new Audio('https://upload.wikimedia.org/wikipedia/commons/e/e0/Chess_capture.ogg');
+const audioEnd = new Audio('https://upload.wikimedia.org/wikipedia/commons/d/d4/Chess_checkmate.ogg');
+
+
 const UNICODE = {
     king: '♚\uFE0E', queen: '♛\uFE0E', rook: '♜\uFE0E', bishop: '♝\uFE0E', knight: '♞\uFE0E', pawn: '♟\uFE0E'
 };
@@ -231,19 +236,54 @@ function updateUI() {
             
             let cellDOM = cellsDOM[y][x];
             cellDOM.className = `cell ${(x+y)%2===0 ? 'light' : 'dark'}`;
-            cellDOM.innerHTML = '';
-            
+        }
+    }
+
+    // Pieces logic
+    let activePieceIds = new Set();
+    for (let y = 0; y < 14; y++) {
+        for (let x = 0; x < 14; x++) {
+            if (!inBounds(x, y)) continue;
             let p = game.board[y][x].piece;
             if (p) {
-                let pDiv = document.createElement('div');
-                pDiv.className = `piece ${p.color}`;
+                let pid = p.id || `fallback_${x}_${y}`;
+                activePieceIds.add(pid);
+                let pDiv = document.getElementById('piece-' + pid);
+                if (!pDiv) {
+                    pDiv = document.createElement('div');
+                    pDiv.id = 'piece-' + pid;
+                    pDiv.className = `piece ${p.color}`;
+                    boardDiv.appendChild(pDiv);
+                }
                 pDiv.innerText = UNICODE[p.type];
-                
                 pDiv.style.setProperty('--rot', `rotate(${-boardRotation}deg)`);
-                cellDOM.appendChild(pDiv);
+                pDiv.style.left = `calc(var(--cell-size) * ${x})`;
+                pDiv.style.top = `calc(var(--cell-size) * ${y})`;
             }
         }
     }
+
+    let deletedCount = 0;
+    let allPiecesDOM = document.querySelectorAll('.piece');
+    allPiecesDOM.forEach(el => {
+        let pid = el.id.replace('piece-', '');
+        if (!activePieceIds.has(pid)) {
+            el.style.opacity = '0';
+            setTimeout(() => el.remove(), 300);
+            deletedCount++;
+        }
+    });
+
+    if (window.lastTurnIndex !== undefined && window.lastTurnIndex !== game.turnIndex) {
+        if (deletedCount > 0) {
+            audioCapture.currentTime = 0;
+            audioCapture.play().catch(e => {});
+        } else {
+            audioMove.currentTime = 0;
+            audioMove.play().catch(e => {});
+        }
+    }
+    window.lastTurnIndex = game.turnIndex;
 
     if (selectedCell && CHESS_COLORS[game.turnIndex] === myColor) {
         cellsDOM[selectedCell.y][selectedCell.x].classList.add('selected');
@@ -295,6 +335,12 @@ function updateUI() {
         document.getElementById('winner-text').innerText = text;
         document.getElementById('game-over-modal').classList.remove('hidden');
         statusText.innerText = "Oyun Bitti";
+        
+        if (window.lastGameOver !== true) {
+            audioEnd.currentTime = 0;
+            audioEnd.play().catch(e => {});
+            window.lastGameOver = true;
+        }
     }
 }
 
@@ -319,3 +365,39 @@ function renderTimer() {
     requestAnimationFrame(renderTimer);
 }
 requestAnimationFrame(renderTimer);
+
+// CHAT SYSTEM LOGIC
+const chatInput = document.getElementById('chat-input');
+const btnSendChat = document.getElementById('btn-send-chat');
+const chatMessages = document.getElementById('chat-messages');
+
+function sendChatMessage() {
+    let text = chatInput.value.trim();
+    if (text.length > 0) {
+        socket.emit('chat_msg', { text });
+        chatInput.value = '';
+    }
+}
+
+btnSendChat.addEventListener('click', sendChatMessage);
+chatInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendChatMessage();
+});
+
+socket.on('chat_msg', (data) => {
+    let entry = document.createElement('div');
+    entry.className = 'chat-entry';
+    let nameElem = document.createElement('strong');
+    nameElem.className = `chat-${data.color}`;
+    nameElem.innerText = data.name + ':';
+    
+    let textElem = document.createElement('span');
+    textElem.innerText = ' ' + data.text;
+    
+    entry.appendChild(nameElem);
+    entry.appendChild(textElem);
+    chatMessages.appendChild(entry);
+    
+    // Scroll to bottom
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+});

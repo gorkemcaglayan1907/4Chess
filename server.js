@@ -210,6 +210,23 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('chat_msg', (data) => {
+        let roomId = userRooms[socket.id];
+        let room = rooms[roomId];
+        if (!room) return;
+
+        let color = room.players[socket.id];
+        if (!color) return;
+        
+        let name = room.playerNames[color];
+        // Sadece odadakilere gönder
+        io.to(roomId).emit('chat_msg', {
+            color: color,
+            name: name,
+            text: data.text.substring(0, 80) // Maks 80 karakter
+        });
+    });
+
     socket.on('disconnect', () => {
         waitingQueue = waitingQueue.filter(p => p.socket.id !== socket.id);
         
@@ -238,7 +255,7 @@ io.on('connection', (socket) => {
     });
 });
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });

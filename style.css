@@ -38,6 +38,33 @@ body {
     align-items: center;
     min-height: 100vh;
     overflow-x: hidden;
+    overflow-y: hidden; /* Prevent scrolling down when landscape */
+}
+
+/* Landscape Mode Warning */
+#landscape-warning {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: #0f172a;
+    z-index: 9999;
+    color: white;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 20px;
+    font-size: 1.5rem;
+    font-weight: 800;
+    flex-direction: column;
+}
+
+@media screen and (orientation: portrait) and (max-width: 768px) {
+    #landscape-warning {
+        display: flex;
+    }
+    #game-container {
+        display: none !important;
+    }
 }
 
 #login-screen, #lobby-screen {
@@ -95,8 +122,6 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    /* Create space around board for labels */
-    padding: 60px;
 }
 
 #chess-board {
@@ -108,6 +133,7 @@ body {
     border-radius: 8px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 20px rgba(255,255,255,0.05);
     transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
 }
 
 .screen-panel {
@@ -126,20 +152,24 @@ body {
     min-width: 100px;
 }
 
+/* Make Active Frame Highly Visible */
 .screen-panel.active-panel {
-    transform: scale(1.1);
-    box-shadow: 0 0 15px rgba(255,255,255,0.1);
+    transform: scale(1.15);
+    box-shadow: 0 0 25px rgba(250, 204, 21, 0.8); /* Strong yellow glow for active player */
+    border-color: rgba(250, 204, 21, 0.9);
+    z-index: 100;
 }
 
-.panel-top { top: 0px; left: 50%; transform: translateX(-50%); }
-.panel-bottom { bottom: 0px; left: 50%; transform: translateX(-50%); }
-.panel-left { left: 0px; top: 50%; transform: translateY(-50%); }
-.panel-right { right: 0px; top: 50%; transform: translateY(-50%); }
+/* Absolute offsets to place them specifically BEHIND the players' sides */
+.panel-top { bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 20px; }
+.panel-bottom { top: 100%; left: 50%; transform: translateX(-50%); margin-top: 20px; }
+.panel-left { right: 100%; top: 50%; transform: translateY(-50%); margin-right: 20px; }
+.panel-right { left: 100%; top: 50%; transform: translateY(-50%); margin-left: 20px; }
 
-.panel-top.active-panel { transform: translateX(-50%) scale(1.1); }
-.panel-bottom.active-panel { transform: translateX(-50%) scale(1.1); }
-.panel-left.active-panel { transform: translateY(-50%) scale(1.1); }
-.panel-right.active-panel { transform: translateY(-50%) scale(1.1); }
+.panel-top.active-panel { transform: translateX(-50%) scale(1.15); }
+.panel-bottom.active-panel { transform: translateX(-50%) scale(1.15); }
+.panel-left.active-panel { transform: translateY(-50%) scale(1.15); }
+.panel-right.active-panel { transform: translateY(-50%) scale(1.15); }
 
 /* Specific Colors overrides based on actual assigned color via JS, but base styling: */
 .screen-panel[data-color="white"] { background: rgba(255, 255, 255, 0.15); border-color: rgba(255,255,255,0.3); }
@@ -175,31 +205,29 @@ body {
     color: #eab308;
 }
 
-/* Mobile Media Query Overrides */
-@media (max-width: 768px) {
-    #board-wrapper {
-        padding: 110px 0 60px 0; /* Padding creates space inside the wrapper for the nameplates */
-        width: 100%;
-        margin-top: 10px;
+/* Mobile Media Query Overrides (Landscape) */
+@media (max-width: 900px) and (orientation: landscape) {
+    :root {
+        --cell-size: min(calc(100vh / 18), 35px); /* Max 35px per cell to fit on phone width, height */
     }
     .screen-panel {
         pointer-events: none; /* Let touches pass through panels to pieces */
         padding: 5px 10px;
         border-radius: 6px;
+        min-width: 80px;
     }
     .player-name { font-size: 0.9rem; max-width: 60px; }
     .player-score { font-size: 0.7rem; }
     
-    /* Place the nameplates positively inside the new 110px padding */
-    .panel-top { top: 10px; }
-    .panel-left { left: 5px; top: 55px; transform: none; flex-direction: row; gap: 5px; }
-    .panel-right { right: 5px; top: 55px; transform: none; flex-direction: row; gap: 5px; }
-    .panel-bottom { bottom: 10px; }
+    /* Make panels smaller and closer to board on mobile borders */
+    .panel-top { margin-bottom: 5px; flex-direction: row; gap: 5px; padding: 2px 5px;}
+    .panel-bottom { margin-top: 5px; flex-direction: row; gap: 5px; padding: 2px 5px;}
+    .panel-left { margin-right: 5px; padding: 2px 5px;}
+    .panel-right { margin-left: 5px; padding: 2px 5px;}
     
-    /* Hide status text on left/right for space */
-    .panel-left .player-status, .panel-right .player-status { display: none; }
+    .panel-top .player-status, .panel-bottom .player-status, .panel-left .player-status, .panel-right .player-status { display: none; }
     
-    .panel-left.active-panel, .panel-right.active-panel { transform: scale(1.05); }
+    .panel-left.active-panel, .panel-right.active-panel, .panel-top.active-panel, .panel-bottom.active-panel { transform: scale(1.05); }
 }
 
 .cell {
@@ -245,13 +273,22 @@ body {
 
 /* PIECES */
 .piece {
+    position: absolute;
+    width: var(--cell-size);
+    height: var(--cell-size);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: calc(var(--cell-size) * 0.95); /* Taller pieces as requested */
+    font-weight: bold;
     cursor: grab;
     z-index: 20;
-    transition: transform 0.1s;
+    transition: left 0.3s ease-in-out, top 0.3s ease-in-out, transform 0.1s;
     user-select: none;
     -webkit-user-drag: none;
-    line-height: var(--cell-size); /* Align vertically */
+    line-height: var(--cell-size);
     transform: scale(1) var(--rot, rotate(0deg));
+    margin: 0;
 }
 
 .piece:hover {
@@ -260,19 +297,19 @@ body {
 
 .piece.white { 
     color: #ffffff;
-    text-shadow: 0px 2px 4px rgba(0,0,0,0.8), 0 0 5px rgba(255,255,255,0.4);
+    text-shadow: 0px 3px 6px rgba(0,0,0,0.9), 0 0 10px rgba(255,255,255,0.7);
 }
 .piece.blue { 
     color: #60a5fa; 
-    text-shadow: 0px 2px 4px rgba(0,0,0,0.8), 0 0 5px rgba(96,165,250,0.4);
+    text-shadow: 0px 3px 6px rgba(0,0,0,0.9), 0 0 10px rgba(96,165,250,0.7);
 }
 .piece.black { 
-    color: #0f172a;
-    text-shadow: 1px 1px 0px #94a3b8, -1px -1px 0px #94a3b8, 1px -1px 0px #94a3b8, -1px 1px 0px #94a3b8, 0px 4px 6px rgba(0,0,0,0.9);
+    color: #1e293b;
+    text-shadow: 1px 1px 0px #cbd5e1, -1px -1px 0px #cbd5e1, 1px -1px 0px #cbd5e1, -1px 1px 0px #cbd5e1, 0px 5px 8px rgba(0,0,0,0.9);
 }
 .piece.red { 
     color: #f87171;
-    text-shadow: 0px 2px 4px rgba(0,0,0,0.8), 0 0 5px rgba(248,113,113,0.4);
+    text-shadow: 0px 3px 6px rgba(0,0,0,0.9), 0 0 10px rgba(248,113,113,0.7);
 }
 
 /* CONTROLS */
@@ -329,4 +366,93 @@ button:active {
     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     text-align: center;
     max-width: 90%;
+}
+
+/* CHAT WIDGET */
+#chat-widget {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    width: 280px;
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+    z-index: 150;
+    backdrop-filter: blur(8px);
+}
+#chat-header {
+    background: #1e293b;
+    padding: 10px;
+    text-align: center;
+    font-weight: 800;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 0.9rem;
+}
+#chat-messages {
+    height: 150px;
+    overflow-y: auto;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 0.85rem;
+}
+.chat-entry {
+    background: rgba(255,255,255,0.05);
+    padding: 6px 10px;
+    border-radius: 8px;
+    word-break: break-word;
+    animation: fadeIn 0.3s ease;
+}
+.chat-entry strong { margin-right: 5px; }
+
+/* Color overrides for chat */
+.chat-white { color: #f8fafc; text-shadow: 0 0 5px rgba(255,255,255,0.5); }
+.chat-black { color: #94a3b8; text-shadow: 0 0 5px rgba(0,0,0,0.5); }
+.chat-blue { color: #60a5fa; text-shadow: 0 0 5px rgba(96,165,250,0.5); }
+.chat-red { color: #f87171; text-shadow: 0 0 5px rgba(248,113,113,0.5); }
+
+#chat-input-area {
+    display: flex;
+    padding: 8px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+}
+#chat-input {
+    flex-grow: 1;
+    background: rgba(255,255,255,0.1);
+    border: none;
+    outline: none;
+    color: white;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+#btn-send-chat {
+    margin-left: 5px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Mobile logic for Chat: Hide by default or make it horizontal top?
+ * We'll just make it smaller and transparent on landscape mobile
+ */
+@media (max-width: 900px) and (orientation: landscape) {
+    #chat-widget {
+        bottom: 5px;
+        left: 5px;
+        width: 220px;
+        background: rgba(15, 23, 42, 0.4);
+    }
+    #chat-header { padding: 4px; font-size: 0.7rem; background: rgba(30, 41, 59, 0.5); }
+    #chat-messages { height: 90px; }
+    #chat-input-area { padding: 4px; }
+    #chat-input { padding: 4px 6px; font-size: 0.75rem; }
+    #btn-send-chat { padding: 4px 8px; font-size: 0.75rem; }
+    .chat-entry { padding: 4px 6px; font-size: 0.75rem; }
 }

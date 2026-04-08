@@ -53,29 +53,32 @@ class GameEngine {
     setupPieces() {
         const backRank = [PIECES.ROOK, PIECES.KNIGHT, PIECES.BISHOP, PIECES.QUEEN, PIECES.KING, PIECES.BISHOP, PIECES.KNIGHT, PIECES.ROOK];
         
+        let idCounter = 1;
+        const generateId = (color, type) => `${color}_${type}_${idCounter++}`;
+
         // White (y = 13, y = 12)
         for (let i = 0; i < 8; i++) {
             let x = i + 3;
-            this.board[13][x].piece = { type: backRank[i], color: 'white' };
-            this.board[12][x].piece = { type: PIECES.PAWN, color: 'white' };
+            this.board[13][x].piece = { type: backRank[i], color: 'white', id: generateId('white', backRank[i]) };
+            this.board[12][x].piece = { type: PIECES.PAWN, color: 'white', id: generateId('white', PIECES.PAWN) };
         }
         // Black (y = 0, y = 1)
         for (let i = 0; i < 8; i++) {
             let x = i + 3;
-            this.board[0][x].piece = { type: backRank[i], color: 'black' };
-            this.board[1][x].piece = { type: PIECES.PAWN, color: 'black' };
+            this.board[0][x].piece = { type: backRank[i], color: 'black', id: generateId('black', backRank[i]) };
+            this.board[1][x].piece = { type: PIECES.PAWN, color: 'black', id: generateId('black', PIECES.PAWN) };
         }
         // Blue (x = 0, x = 1)
         for (let i = 0; i < 8; i++) {
             let y = i + 3;
-            this.board[y][0].piece = { type: backRank[i], color: 'blue' };
-            this.board[y][1].piece = { type: PIECES.PAWN, color: 'blue' };
+            this.board[y][0].piece = { type: backRank[i], color: 'blue', id: generateId('blue', backRank[i]) };
+            this.board[y][1].piece = { type: PIECES.PAWN, color: 'blue', id: generateId('blue', PIECES.PAWN) };
         }
         // Red (x = 13, x = 12)
         for (let i = 0; i < 8; i++) {
             let y = i + 3;
-            this.board[y][13].piece = { type: backRank[i], color: 'red' };
-            this.board[y][12].piece = { type: PIECES.PAWN, color: 'red' };
+            this.board[y][13].piece = { type: backRank[i], color: 'red', id: generateId('red', backRank[i]) };
+            this.board[y][12].piece = { type: PIECES.PAWN, color: 'red', id: generateId('red', PIECES.PAWN) };
         }
     }
 

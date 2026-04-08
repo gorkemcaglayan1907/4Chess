@@ -8,6 +8,12 @@
     <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
+    <!-- Landscape Orientation Warning -->
+    <div id="landscape-warning">
+        <div style="font-size: 3rem; margin-bottom:10px;">🔄</div>
+        Lütfen Telefonunuzu Yatay Döndürün
+        <p style="font-size: 1rem; color: #94a3b8; font-weight: normal; margin-top: 10px;">En iyi oyun deneyimi için cihazınız yan konumda olmalıdır.</p>
+    </div>
     
     <!-- Login Screen -->
     <div id="login-screen">
@@ -74,6 +80,16 @@
         <div class="modal-content">
             <h2 id="winner-text">Oyun Bitti!</h2>
             <p>Oda süresi doldu veya kazanan belirlendi. Lütfen lobiden tekrar eşleşin.</p>
+        </div>
+    </div>
+
+    <!-- Chat UI -->
+    <div id="chat-widget">
+        <div id="chat-header">Oyun Sohbeti</div>
+        <div id="chat-messages"></div>
+        <div id="chat-input-area">
+            <input type="text" id="chat-input" placeholder="Mesajınız..." maxlength="60">
+            <button id="btn-send-chat">Gönder</button>
         </div>
     </div>
 
