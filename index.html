@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>4CHESS</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=4">
+    <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
     <!-- Landscape Orientation Warning -->
@@ -15,19 +15,14 @@
         <p style="font-size: 1rem; color: #94a3b8; font-weight: normal; margin-top: 10px;">For the best experience, please hold your device horizontally.</p>
     </div>
     
-    <!-- Language Toggle Removed - English Only -->
-    
-    <!-- Sound Toggle Button -->
-    <button id="mute-toggle-btn">🔊</button>
-    
+
     <!-- Login & Main Menu Screen -->
     <div id="login-screen">
         <div class="modal-content" style="max-width: 400px; width: 100%;">
             <h1 style="color:var(--color-blue); margin-bottom:5px;">4CHESS</h1>
             <p style="margin-bottom:20px; color:#94a3b8;">Join the epic multiplayer chess experience</p>
             
-            <input type="text" id="username-input" placeholder="Your Player Name" maxlength="15" style="margin-bottom: 10px;">
-            <select id="flag-select" style="width:100%; padding: 10px; margin-bottom: 20px; border-radius: 8px; font-weight: 600;"></select>
+            <input type="text" id="username-input" placeholder="Your Player Name" maxlength="15" style="margin-bottom: 20px;">
             
             <div id="menu-actions" style="display:flex; flex-direction:column; gap:10px;">
                 <button id="btn-quick-play" style="background-color: var(--color-blue);">Quick Play</button>
@@ -50,25 +45,26 @@
         <div class="modal-content">
             <h2>Waiting for Players 🔍</h2>
             <div id="queue-status" style="font-size:1.2rem; font-weight:600; color:var(--board-light);">Connecting...</div>
-            <div id="timer-status" style="font-size:2rem; font-weight:800; color:var(--color-red); margin-top:10px;">15s</div>
+            <div id="timer-status" style="font-size:2rem; font-weight:800; color:var(--color-red); margin-top:10px;"></div>
             <div class="spinner"></div>
+            <div id="cancel-queue-container">
+                <button id="btn-cancel-queue" style="background:var(--color-red); margin-top:10px;">Cancel</button>
+            </div>
             <p class="small-text" style="color:#64748b; margin-top:20px; font-size:0.85rem;">Bots will take empty seats when time's up.</p>
         </div>
     </div>
 
     <!-- Match interface -->
     <div id="game-container" class="hidden">
-        <div id="turn-indicator-wrapper" style="text-align: center; margin-bottom: 20px; z-index: 50; position: relative; display:flex; justify-content:center; align-items:center; gap: 15px;">
+        <div id="turn-indicator-wrapper">
             <div>
-                <h2 id="turn-indicator">Turn: White</h2>
+                <h2 id="turn-indicator">Turn: <span id="turn-player-name">...</span></h2>
                 <p id="game-status-text">Waiting for game...</p>
                 <div id="turn-timer-visual" style="font-size: 1.5rem; font-weight: 800; color: #f59e0b; margin-top: 5px;"></div>
             </div>
-            <div style="display:flex; flex-direction:column; gap:5px;">
-                <button id="btn-resign" style="background:var(--color-red); color:var(--color-white); border:none; padding: 10px 15px; border-radius:8px; font-weight:800; cursor:pointer;" class="hidden">🏳️ Resign</button>
-                <button id="btn-exit-lobby" style="background:var(--board-dark); color:var(--color-white); border:none; padding: 10px 15px; border-radius:8px; font-weight:800; cursor:pointer;" class="hidden">🏠 Home</button>
-            </div>
         </div>
+
+        <button id="btn-resign" style="position:fixed; top:20px; right: 15px; z-index: 2000; background:var(--color-red); color:var(--color-white); border:none; padding: 12px 20px; border-radius:8px; font-weight:800; cursor:pointer;" class="hidden">🏳️ Resign</button>
 
         <div id="board-wrapper">
             <!-- Screen HUDs -->
@@ -104,6 +100,7 @@
         <div class="modal-content">
             <h2 id="winner-text">Game Over!</h2>
             <p>Room expired or a winner has been decided. Please rejoin via lobby.</p>
+            <button id="btn-back-to-lobby" style="margin-top:20px; background:var(--color-blue); width:100%;">Back to Lobby</button>
         </div>
     </div>
 
@@ -136,6 +133,6 @@
     </div>
     <script src="/socket.io/socket.io.js"></script>
     <script src="engine.js?v=6"></script>
-    <script src="ui.js?v=6"></script>
+    <script src="ui.js?v=10"></script>
 </body>
 </html>

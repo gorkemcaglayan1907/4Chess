@@ -1,635 +1,366 @@
-const socket = io();
-
-// Sound logic removed as per user request
-let currentRoomId = null;
-
-const DICT = {
-    en: {
-        warn_landscape: "Please Rotate Your Device",
-        warn_sub: "For the best experience, hold your device horizontally.",
-        title_sub: "Join epic multiplayer matchmaking",
-        placeholder_name: "Player Name",
-        btn_quick: "Log In (Quick Play)",
-        btn_create: "Create Room",
-        btn_join_prompt: "Join Room",
-        btn_leaderboard: "🏆 Leaderboard",
-        placeholder_code: "Room Code",
-        btn_join: "Connect",
-        team_mode_txt: "2v2 Team Mode (Private Rooms Only)",
-        lobby_title: "Matchmaking 🔍",
-        queue_connecting: "Connecting...",
-        bot_info: "Bots will fill empty seats when time runs out.",
-        chat_title: "Game Chat",
-        chat_placeholder: "Type a message...",
-        btn_send: "Send",
-        btn_resign: "🏳️ Resign",
-        btn_close: "Close",
-        leaderboard_empty: "No champions yet.",
-        leaderboard_title: "🏆 Leaderboard",
-        
-        status_eliminated: "Eliminated",
-        status_thinking: "Thinking...",
-        status_waiting: "Waiting",
-        status_game_over: "Game Over",
-        turn: "Turn: ",
-        points: "Score: ",
-        draw: "Draw!",
-        wait_move: "Waiting for move...",
-        
-        win_wb: "Winner: White/Black Team!",
-        win_br: "Winner: Blue/Red Team!",
-        win_p: "Winner: ",
-        
-        colors: { white: 'Green', blue: 'Blue', black: 'Black', red: 'Red' },
-        
-        resign_confirm: "Are you sure you want to resign? Your ally might be left alone!",
-        exit_confirm: "Are you sure you want to exit? Your place will be taken by a bot!",
-        err_code: "Invalid Room Code!",
-        room_txt: "Room: ",
-        room_wait: "Waiting..."
-    }
-};
-
-let currentLang = 'en';
-let TR_COLORS = DICT[currentLang].colors;
-
-function executeI18N() {
-    let d = DICT[currentLang];
-    TR_COLORS = d.colors;
-    
-    let el = (id) => document.getElementById(id);
-    let setEl = (id, txt) => { if(el(id)) el(id).innerText = txt; };
-    let setPl = (id, txt) => { if(el(id)) el(id).placeholder = txt; };
-    
-    if(el('landscape-warning')) {
-        let wrn = el('landscape-warning');
-        wrn.childNodes[2].nodeValue = " " + d.warn_landscape + " ";
-        wrn.querySelector('p').innerText = d.warn_sub;
-    }
-    
-    if(el('login-screen')) {
-        el('login-screen').querySelector('p').innerText = d.title_sub;
-        setPl('username-input', d.placeholder_name);
-        setEl('btn-quick-play', d.btn_quick);
-        setEl('btn-create-room', d.btn_create);
-        setEl('btn-join-room-prompt', d.btn_join_prompt);
-        setEl('btn-leaderboard', d.btn_leaderboard);
-        setPl('room-code-input', d.placeholder_code);
-        setEl('btn-join-room', d.btn_join);
-        let tmLbl = document.querySelector('label[style*="color:#94a3b8"] span');
-        if(tmLbl) tmLbl.innerText = d.team_mode_txt;
-    }
-    
-    if(el('lobby-screen')) {
-        el('lobby-screen').querySelector('h2').innerText = d.lobby_title;
-        if(el('queue-status').innerText.includes('Bağlanılıyor') || el('queue-status').innerText.includes('Connecting')) {
-            setEl('queue-status', d.queue_connecting);
-        }
-        el('lobby-screen').querySelector('p.small-text').innerText = d.bot_info;
-    }
-    
-    if(el('chat-header')) {
-        let closeSpan = el('chat-close-btn');
-        el('chat-header').innerHTML = d.chat_title;
-        el('chat-header').appendChild(closeSpan);
-        setPl('chat-input', d.chat_placeholder);
-        setEl('btn-send-chat', d.btn_send);
-        setEl('chat-toggle-btn', "💬 " + d.chat_title);
-    }
-    
-    setEl('btn-resign', d.btn_resign);
-    setEl('btn-close-leaderboard', d.btn_close);
-    if(el('leaderboard-modal')) {
-        el('leaderboard-modal').querySelector('h2').innerText = d.leaderboard_title;
-    }
-    
-    if(typeof game !== 'undefined' && game) { updateUI(); }
-}
-
+// Defensive Initialization
 window.addEventListener('DOMContentLoaded', () => {
-    executeI18N();
-});
-
-
-
-const UNICODE = {
-    king: '♚\uFE0E', queen: '♛\uFE0E', rook: '♜\uFE0E', bishop: '♝\uFE0E', knight: '♞\uFE0E', pawn: '♟\uFE0E'
-};
-
-// TR_COLORS dynamic map
-
-let game = null; 
-let myColor = null; 
-let selectedCell = null;
-let validMovesForSelected = [];
-let cellsDOM = [];
-let playerNamesMap = {};
-let playerFlagsMap = {};
-let turnEndTime = 0;
-let boardRotation = 0;
-let panelMap = { white: 'bottom', black: 'top', blue: 'left', red: 'right' };
-
-const ALL_FLAGS = [
-    {code: 'tr', name: 'Turkey'}, {code: 'az', name: 'Azerbaijan'}, {code: 'us', name: 'USA'},
-    {code: 'de', name: 'Germany'}, {code: 'ar', name: 'Argentina'}, {code: 'au', name: 'Australia'},
-    {code: 'at', name: 'Austria'}, {code: 'ae', name: 'UAE'}, {code: 'be', name: 'Belgium'}, 
-    {code: 'gb', name: 'United Kingdom'}, {code: 'br', name: 'Brazil'}, {code: 'bg', name: 'Bulgaria'}, 
-    {code: 'dz', name: 'Algeria'}, {code: 'cn', name: 'China'}, {code: 'dk', name: 'Denmark'}, 
-    {code: 'id', name: 'Indonesia'}, {code: 'ma', name: 'Morocco'}, {code: 'ps', name: 'Palestine'}, 
-    {code: 'fi', name: 'Finland'}, {code: 'fr', name: 'France'}, {code: 'za', name: 'South Africa'}, 
-    {code: 'kr', name: 'South Korea'}, {code: 'in', name: 'India'}, {code: 'nl', name: 'Netherlands'}, 
-    {code: 'iq', name: 'Iraq'}, {code: 'ir', name: 'Iran'}, {code: 'es', name: 'Spain'}, 
-    {code: 'se', name: 'Sweden'}, {code: 'ch', name: 'Switzerland'}, {code: 'it', name: 'Italy'}, 
-    {code: 'jp', name: 'Japan'}, {code: 'ca', name: 'Canada'}, {code: 'kz', name: 'Kazakhstan'}, 
-    {code: 'my', name: 'Malaysia'}, {code: 'mx', name: 'Mexico'}, {code: 'eg', name: 'Egypt'}, 
-    {code: 'no', name: 'Norway'}, {code: 'pk', name: 'Pakistan'}, {code: 'pl', name: 'Poland'}, 
-    {code: 'ro', name: 'Romania'}, {code: 'ru', name: 'Russia'}, {code: 'sg', name: 'Singapore'}, 
-    {code: 'sy', name: 'Syria'}, {code: 'sa', name: 'Saudi Arabia'}, {code: 'ua', name: 'Ukraine'}, 
-    {code: 'gr', name: 'Greece'}
-];
-
-function getFlagEmoji(countryCode) {
-  const codePoints = countryCode.toUpperCase().split('').map(char => 127397 + char.charCodeAt(0));
-  return String.fromCodePoint(...codePoints);
-}
-
-const boardDiv = document.getElementById('chess-board');
-const indicator = document.getElementById('turn-indicator');
-const statusText = document.getElementById('game-status-text');
-const turnTimerDOM = document.getElementById('turn-timer-visual');
-
-const usernameInput = document.getElementById('username-input');
-const flagSelect = document.getElementById('flag-select');
-
-// Flag options populate
-ALL_FLAGS.forEach(f => {
-    let opt = document.createElement('option');
-    opt.value = f.code;
-    opt.innerText = `${getFlagEmoji(f.code)} ${f.name}`;
-    flagSelect.appendChild(opt);
-});
-
-// Daha önce giriş yapmış mı kontrol et
-const savedUsername = localStorage.getItem('4chess_username');
-const savedFlag = localStorage.getItem('4chess_flag');
-if (savedUsername) {
-    usernameInput.value = savedUsername;
-}
-if (savedFlag) {
-    flagSelect.value = savedFlag;
-}
-
-function getNameAndFlag() {
-    let name = usernameInput.value.trim();
-    if (name === '') name = 'Unnamed' + Math.floor(Math.random()*100);
-    let flag = flagSelect.value;
-    localStorage.setItem('4chess_username', name);
-    localStorage.setItem('4chess_flag', flag);
-    return { name, flag };
-}
-
-document.getElementById('btn-quick-play').addEventListener('click', () => {
-    let credentials = getNameAndFlag();
-    document.getElementById('login-screen').classList.add('hidden');
-    document.getElementById('lobby-screen').classList.remove('hidden');
-    socket.emit('join_queue', { username: credentials.name, flag: credentials.flag });
-});
-
-document.getElementById('btn-create-room').addEventListener('click', () => {
-    let credentials = getNameAndFlag();
-    document.getElementById('login-screen').classList.add('hidden');
-    document.getElementById('lobby-screen').classList.remove('hidden');
-    credentials.teamMode = document.getElementById('chk-team-mode').checked;
-    socket.emit('create_room', credentials);
-});
-
-document.getElementById('btn-join-room-prompt').addEventListener('click', () => {
-    document.getElementById('join-room-container').classList.toggle('hidden');
-});
-
-document.getElementById('btn-join-room').addEventListener('click', () => {
-    let code = document.getElementById('room-code-input').value.trim();
-    if(code.length === 4) {
-        let credentials = getNameAndFlag();
-        document.getElementById('login-screen').classList.add('hidden');
-        document.getElementById('lobby-screen').classList.remove('hidden');
-        socket.emit('join_room', { code: code, ...credentials });
-    } else {
-        alert(DICT[currentLang].err_code);
-    }
-});
-
-socket.on('custom_room_joined', (data) => {
-    document.getElementById('queue-status').innerText = `${DICT[currentLang].room_txt}${data.code} | ${data.count} / 4`;
-    document.getElementById('timer-status').innerText = 'Waiting...';
-});
-
-socket.on('room_error', (msg) => {
-    alert(msg);
-    document.getElementById('lobby-screen').classList.add('hidden');
-    document.getElementById('login-screen').classList.remove('hidden');
-});
-
-socket.on('queue_update', (data) => {
-    document.getElementById('queue-status').innerText = `Waiting for Players: ${data.count} / ${data.max}`;
-    let timerDiv = document.getElementById('timer-status');
-    if (data.count === 0) {
-        timerDiv.innerText = '';
-    } else {
-        let left = data.secondsLeft !== undefined ? data.secondsLeft : data.timer;
-        let sc = left < 10 ? '0'+left : left;
-        timerDiv.innerText = `00:${sc}`;
-    }
-});
-
-socket.on('match_found', (data) => {
-    myColor = data.color;
-    document.getElementById('game-container').classList.remove('hidden');
-    document.title = `4CHESS - ${TR_COLORS[myColor]}`;
-    currentRoomId = data.roomId; // Oda kimliğini kaydet
+    console.log("4CHESS: UI Initialization started...");
     
-    if (myColor === 'white' || !myColor) {
-        boardRotation = 0;
-        panelMap = { white: 'bottom', black: 'top', blue: 'left', red: 'right' };
-    } else if (myColor === 'black') {
-        boardRotation = 180;
-        panelMap = { black: 'bottom', white: 'top', red: 'left', blue: 'right' };
-    } else if (myColor === 'blue') {
-        boardRotation = 270;
-        panelMap = { blue: 'bottom', red: 'top', black: 'left', white: 'right' };
-    } else if (myColor === 'red') {
-        boardRotation = 90;
-        panelMap = { red: 'bottom', blue: 'top', white: 'left', black: 'right' };
+    let socket;
+    try {
+        socket = io();
+    } catch (e) {
+        console.error("4CHESS: Socket.io failed to initialize!", e);
+        return;
     }
 
-    boardDiv.style.transform = `rotate(${boardRotation}deg)`;
-    initUI(); 
-});
+    let currentRoomId = null;
+    const UNICODE = {
+        king: '♚\uFE0E', queen: '♛\uFE0E', rook: '♜\uFE0E', bishop: '♝\uFE0E', knight: '♞\uFE0E', pawn: '♟\uFE0E'
+    };
+    const CHESS_COLORS = ['white', 'blue', 'black', 'red'];
+    const COLOR_NAMES = { white: 'Green', blue: 'Blue', black: 'Black', red: 'Red' };
 
-socket.on('init_state', (state) => {
-    if (state.roomId && state.roomId !== currentRoomId) return; // Filtrele
-    game = state; 
-    playerNamesMap = state.playerNames;
-    playerFlagsMap = state.playerFlags || {};
-    syncState(state);
-});
+    let gameData = null; 
+    let myColor = null; 
+    let selectedCell = null;
+    let validMovesForSelected = [];
+    let cellsDOM = [];
+    let playerNamesMap = {};
+    let playerScoresMap = {};
+    let playerActiveMap = {};
+    let turnEndTime = 0;
+    let bannedUntil = 0;
+    let boardRotation = 0;
+    let panelMap = { white: 'bottom', black: 'top', blue: 'left', red: 'right' };
 
-socket.on('state_update', (state) => {
-    if (state.roomId && state.roomId !== currentRoomId) return; // Filtrele
-    syncState(state);
-});
+    const boardDiv = document.getElementById('chess-board');
+    const indicator = document.getElementById('turn-indicator');
+    const statusText = document.getElementById('game-status-text');
+    const turnTimerDOM = document.getElementById('turn-timer-visual');
+    const usernameInput = document.getElementById('username-input');
+    const chatInput = document.getElementById('chat-input');
+    const btnSendChat = document.getElementById('btn-send-chat');
+    const chatMessages = document.getElementById('chat-messages');
+    const chatToggle = document.getElementById('chat-toggle-btn');
+    const chatWidget = document.getElementById('chat-widget');
+    const chatClose = document.getElementById('chat-close-btn');
 
-function syncState(state) {
-    game.board = state.board;
-    game.turnIndex = state.turnIndex;
-    game.scores = state.scores;
-    game.activePlayers = state.activePlayers;
-    game.gameOver = state.gameOver;
-    game.winner = state.winner;
-    if (state.playerNames) playerNamesMap = state.playerNames;
-    if (state.playerFlags) playerFlagsMap = state.playerFlags || {};
-    if (state.turnEndTime !== undefined) turnEndTime = state.turnEndTime || 0;
-    if (state.teamMode !== undefined) game.teamMode = state.teamMode || false;
-    
-    if (state.lastMove !== undefined) {
-        game.lastMove = state.lastMove;
-    }
-    
-    selectedCell = null;
-    validMovesForSelected = [];
-    updateUI();
-}
+    if (!usernameInput) return;
 
-function inBounds(x, y) {
-    if (x < 3 && y < 3) return false;
-    if (x > 10 && y < 3) return false;
-    if (x < 3 && y > 10) return false;
-    if (x > 10 && y > 10) return false;
-    return x >= 0 && x <= 13 && y >= 0 && y <= 13;
-}
-
-function initUI() {
-    cellsDOM = [];
-    boardDiv.innerHTML = '';
-    
-    for (let y = 0; y < 14; y++) {
-        let rowDOM = [];
-        for (let x = 0; x < 14; x++) {
-            let cell = document.createElement('div');
-            cell.classList.add('cell');
-            
-            if (!inBounds(x, y)) {
-                cell.classList.add('dead');
-            } else {
-                if ((x + y) % 2 === 0) {
-                    cell.classList.add('light');
-                } else {
-                    cell.classList.add('dark');
-                }
-                
-                cell.addEventListener('mousedown', () => handleCellClick(x, y));
-                cell.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    handleCellClick(x, y);
-                }, {passive: false});
-            }
-            
-            boardDiv.appendChild(cell);
-            rowDOM.push(cell);
-        }
-        cellsDOM.push(rowDOM);
-    }
-}
-
-function handleCellClick(x, y) {
-    if (game.gameOver || !myColor) return;
-    
-    let currentTurnColor = CHESS_COLORS[game.turnIndex];
-    if (currentTurnColor !== myColor) return;
-
-    let clickedPiece = game.board[y][x].piece; 
-    
-    if (selectedCell) {
-        let move = validMovesForSelected.find(m => m.x === x && m.y === y);
-        if (move) {
-            socket.emit('make_move', { fx: selectedCell.x, fy: selectedCell.y, tx: x, ty: y });
-            selectedCell = null;
-            validMovesForSelected = [];
-            updateUI();
-            return;
-        }
-    }
-
-    if (typeof GameEngine !== 'undefined') {
-        let localSandbox = new GameEngine();
-        localSandbox.board = game.board;
-        localSandbox.activePlayers = game.activePlayers;
-        
-        if (clickedPiece && clickedPiece.color === myColor) {
-            selectedCell = { x, y };
-            validMovesForSelected = localSandbox.getValidMoves(x, y);
-            updateUI();
+    // Persistence
+    try {
+        const savedUsername = localStorage.getItem('4chess_username');
+        if (savedUsername) {
+            usernameInput.value = savedUsername;
         } else {
-            selectedCell = null;
-            validMovesForSelected = [];
-            updateUI();
+            usernameInput.value = 'Player_' + Math.random().toString(36).substring(7).toUpperCase();
         }
+    } catch (e) {
+        usernameInput.value = 'Player_' + Math.floor(Math.random()*9999);
     }
-}
 
-function updateUI() {
-    // Board logic
-    for (let y = 0; y < 14; y++) {
-        for (let x = 0; x < 14; x++) {
-            if (!inBounds(x, y)) continue;
+    function saveName() {
+        let name = usernameInput.value.trim() || 'Guest';
+        try { localStorage.setItem('4chess_username', name); } catch(e) {}
+        return name;
+    }
+
+    function showScreen(id) {
+        const screens = ['login-screen', 'lobby-screen', 'game-container'];
+        screens.forEach(s => {
+            let el = document.getElementById(s);
+            if(el) el.classList.add('hidden');
+        });
+        let target = document.getElementById(id);
+        if(target) target.classList.remove('hidden');
+    }
+
+    // Main Click Handler (Unified)
+    if (boardDiv) {
+        boardDiv.addEventListener('mousedown', (e) => {
+            if (!gameData || gameData.gameOver || !myColor) return;
             
-            let cellDOM = cellsDOM[y][x];
-            cellDOM.className = `cell ${(x+y)%2===0 ? 'light' : 'dark'}`;
-        }
-    }
-
-    // Pieces logic
-    let activePieceIds = new Set();
-    for (let y = 0; y < 14; y++) {
-        for (let x = 0; x < 14; x++) {
-            if (!inBounds(x, y)) continue;
-            let p = game.board[y][x].piece;
-            if (p) {
-                let pid = p.id || `fallback_${x}_${y}`;
-                activePieceIds.add(pid);
-                let pDiv = document.getElementById('piece-' + pid);
-                if (!pDiv) {
-                    pDiv = document.createElement('div');
-                    pDiv.id = 'piece-' + pid;
-                    pDiv.className = `piece ${p.color}`;
-                    boardDiv.appendChild(pDiv);
-                }
-                
-                // Add playable class for hover effects
-                if (myColor && p.color === myColor && game.turnIndex !== undefined && CHESS_COLORS[game.turnIndex] === myColor && !game.gameOver) {
-                    pDiv.classList.add('playable');
-                } else {
-                    pDiv.classList.remove('playable');
-                }
-                
-                pDiv.innerText = UNICODE[p.type];
-                pDiv.style.setProperty('--rot', `rotate(${-boardRotation}deg)`);
-                pDiv.style.left = `calc(var(--cell-size) * ${x})`;
-                pDiv.style.top = `calc(var(--cell-size) * ${y})`;
-            }
-        }
-    }
-    
-    if (game.lastMove) {
-        let lm = game.lastMove;
-        if (inBounds(lm.fx, lm.fy)) cellsDOM[lm.fy][lm.fx].classList.add('last-move');
-        if (inBounds(lm.tx, lm.ty)) cellsDOM[lm.ty][lm.tx].classList.add('last-move');
-    }
-
-    let deletedCount = 0;
-    let allPiecesDOM = document.querySelectorAll('.piece');
-    allPiecesDOM.forEach(el => {
-        let pid = el.id.replace('piece-', '');
-        if (!activePieceIds.has(pid)) {
-            el.style.opacity = '0';
-            setTimeout(() => el.remove(), 300);
-            deletedCount++;
-        }
-    });
-
-    if (window.lastTurnIndex !== undefined && window.lastTurnIndex !== game.turnIndex) {
-        if (soundEnabled) {
-            if (deletedCount > 0) {
-                audioCapture.currentTime = 0;
-                audioCapture.play().catch(e => {});
-            } else {
-                audioMove.currentTime = 0;
-                audioMove.play().catch(e => {});
-            }
-        }
-    }
-    window.lastTurnIndex = game.turnIndex;
-
-    if (selectedCell && CHESS_COLORS[game.turnIndex] === myColor) {
-        cellsDOM[selectedCell.y][selectedCell.x].classList.add('selected');
-        for (let mv of validMovesForSelected) {
-            let trgDOM = cellsDOM[mv.y][mv.x];
-            trgDOM.classList.add('highlight-move');
-            if (mv.capture) trgDOM.classList.add('has-enemy');
-        }
-    }
-
-    // HUD logic
-    let currentTurn = CHESS_COLORS[game.turnIndex];
-    let turnOwnerName = playerNamesMap[currentTurn] || TR_COLORS[currentTurn];
-    indicator.innerText = `${DICT[currentLang].turn}${turnOwnerName}`;
-    
-    for (let c of CHESS_COLORS) {
-        let pos = panelMap[c]; // top, bottom, left, right maps to screen orientation
-        let pnl = document.getElementById(`panel-screen-${pos}`);
-        
-        pnl.dataset.color = c; 
-        pnl.classList.remove('active-panel');
-        let status = pnl.querySelector('.player-status');
-        let nameField = pnl.querySelector('.player-name');
-        let scoreField = pnl.querySelector('.player-score');
-        
-        let cFlag = playerFlagsMap[c];
-        let flagImg = cFlag ? `<img src="https://flagcdn.com/w20/${cFlag}.png" style="vertical-align:middle; width:16px; margin-right:4px; border-radius:2px;" />` : '';
-        
-        nameField.innerHTML = `${flagImg}${playerNamesMap[c] || TR_COLORS[c]}`;
-        scoreField.innerText = `${DICT[currentLang].points}${(game.scores && game.scores[c]) || 0}`;
-        
-        if (!game.activePlayers[c]) {
-            status.innerText = DICT[currentLang].status_eliminated;
-            pnl.style.opacity = '0.4';
-            if (c === myColor) document.getElementById('btn-resign').classList.add('hidden');
-        } else if (currentTurn === c) {
-            pnl.classList.add('active-panel');
-            status.innerText = DICT[currentLang].status_thinking;
-            statusText.innerText = DICT[currentLang].wait_move;
-            pnl.style.opacity = '1';
-            if (c === myColor) {
-                document.getElementById('btn-resign').classList.remove('hidden');
-                document.getElementById('btn-exit-lobby').classList.remove('hidden');
-            }
-        } else {
-            status.innerText = DICT[currentLang].status_waiting;
-            pnl.style.opacity = '0.8';
-            if (c === myColor) {
-                document.getElementById('btn-resign').classList.remove('hidden');
-                document.getElementById('btn-exit-lobby').classList.remove('hidden');
-            }
-        }
-    }
-
-    if (game.gameOver) {
-        let w = game.winner;
-        let text = w ? (game.teamMode ? (w==="white" ? DICT[currentLang].win_wb : DICT[currentLang].win_br) : `${DICT[currentLang].win_p}${playerNamesMap[w]}!`) : DICT[currentLang].draw;
-        document.getElementById('winner-text').innerText = text;
-        document.getElementById('game-over-modal').classList.remove('hidden');
-        statusText.innerText = DICT[currentLang].status_game_over;
-        
-        if (window.lastGameOver !== true) {
-            // Sound playback removed as per user request
-            window.lastGameOver = true;
-        }
-    }
-}
-
-function renderTimer() {
-    if (game && !game.gameOver && turnEndTime > 0) {
-        let leftMs = turnEndTime - Date.now();
-        if (leftMs < 0) leftMs = 0;
-        let secs = Math.ceil(leftMs / 1000);
-        
-        if (secs <= 5) {
-            turnTimerDOM.style.color = '#ef4444'; // Red
-            turnTimerDOM.style.transform = `scale(${1 + (leftMs % 1000 < 500 ? 0.1 : 0)})`; 
-        } else {
-            turnTimerDOM.style.color = '#f59e0b'; // Orange
-            turnTimerDOM.style.transform = 'scale(1)';
-        }
-        
-        turnTimerDOM.innerText = `⏳ ${secs} seconds`;
-    } else if (turnTimerDOM) {
-        turnTimerDOM.innerText = '';
-    }
-    requestAnimationFrame(renderTimer);
-}
-requestAnimationFrame(renderTimer);
-
-document.getElementById('btn-resign').addEventListener('click', () => {
-    if (confirm(DICT[currentLang].resign_confirm)) {
-        socket.emit('resign');
-    }
-});
-
-document.getElementById('btn-exit-lobby').addEventListener('click', () => {
-    if (game && !game.gameOver) {
-        if (confirm(DICT[currentLang].exit_confirm)) {
-            socket.emit('resign');
-            location.reload(); // Web versiyonunda reload en temizi
-        }
-    } else {
-        location.reload();
-    }
-});
-
-// CHAT SYSTEM LOGIC
-const chatWidget = document.getElementById('chat-widget');
-const chatInput = document.getElementById('chat-input');
-const btnSendChat = document.getElementById('btn-send-chat');
-const chatMessages = document.getElementById('chat-messages');
-
-// Mobile Toggle Listeners
-document.getElementById('chat-toggle-btn').addEventListener('click', () => {
-    chatWidget.classList.add('chat-open');
-});
-document.getElementById('chat-close-btn').addEventListener('click', () => {
-    chatWidget.classList.remove('chat-open');
-});
-
-// Sound logic removed as per user request
-
-function sendChatMessage() {
-    let text = chatInput.value.trim();
-    if (text.length > 0) {
-        socket.emit('chat_msg', { text });
-        chatInput.value = '';
-    }
-}
-
-btnSendChat.addEventListener('click', sendChatMessage);
-chatInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') sendChatMessage();
-});
-
-socket.on('chat_msg', (data) => {
-    if (data.roomId && data.roomId !== currentRoomId) return; // Filtrele
-    let entry = document.createElement('div');
-    entry.className = 'chat-entry';
-    let nameElem = document.createElement('strong');
-    nameElem.className = `chat-${data.color}`;
-    nameElem.innerText = data.name + ':';
-    
-    let textElem = document.createElement('span');
-    textElem.innerText = ' ' + data.text;
-    
-    entry.appendChild(nameElem);
-    entry.appendChild(textElem);
-    chatMessages.appendChild(entry);
-    
-    // Scroll to bottom
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-});
-
-
-document.getElementById('btn-leaderboard').addEventListener('click', () => {
-    socket.emit('get_leaderboard');
-});
-
-socket.on('leaderboard_res', (list) => {
-    let div = document.getElementById('leaderboard-list');
-    div.innerHTML = '';
-    if (list.length === 0) {
-        div.innerHTML = '<div style="text-align:center; color:#94a3b8;">No champions yet.</div>';
-    } else {
-        list.forEach((item, index) => {
-            let row = document.createElement('div');
-            row.style.padding = "8px";
-            row.style.borderBottom = "1px solid rgba(255,255,255,0.1)";
-            row.style.display = "flex";
-            row.style.justifyContent = "space-between";
+            const rect = boardDiv.getBoundingClientRect();
+            const cellSize = rect.width / 14;
+            let rawX = Math.floor((e.clientX - rect.left) / cellSize);
+            let rawY = Math.floor((e.clientY - rect.top) / cellSize);
             
-            let pos = index === 0 ? "🥇" : (index === 1 ? "🥈" : (index === 2 ? "🥉" : (index+1)+"." ));
-            row.innerHTML = '<span><strong style="color:#eab308; margin-right:5px;">'+pos+'</strong> ' + item.name + '</span><span style="font-weight:bold; color:var(--board-light);">'+item.score+'</span>';
-            div.appendChild(row);
+            if (rawX < 0 || rawX > 13 || rawY < 0 || rawY > 13) return;
+            handleCellClick(rawX, rawY);
         });
     }
-    document.getElementById('leaderboard-modal').classList.remove('hidden');
-});
 
-document.getElementById('btn-close-leaderboard').addEventListener('click', () => {
-    document.getElementById('leaderboard-modal').classList.add('hidden');
+    const btnQuick = document.getElementById('btn-quick-play');
+    if (btnQuick) {
+        btnQuick.addEventListener('click', () => {
+            let name = saveName();
+            socket.emit('join_queue', { username: name, flag: 'us' });
+            showScreen('lobby-screen');
+        });
+    }
+
+    // Other buttons...
+    const btnCancel = document.getElementById('btn-cancel-queue');
+    if(btnCancel) btnCancel.addEventListener('click', () => location.reload());
+    const btnBackLobby = document.getElementById('btn-back-to-lobby');
+    if(btnBackLobby) btnBackLobby.addEventListener('click', () => location.reload());
+    const btnLeaderboard = document.getElementById('btn-leaderboard');
+    if(btnLeaderboard) btnLeaderboard.addEventListener('click', () => socket.emit('get_leaderboard'));
+    window.handleResign = () => {
+        console.log("4CHESS: handleResign triggered!");
+        if (confirm("Are you sure you want to resign and leave?")) {
+            console.log("4CHESS: Resign confirmed, emitting...");
+            socket.emit('resign');
+            alert("Resigned! Returning to lobby.");
+            location.reload();
+        }
+    };
+    const btnResign = document.getElementById('btn-resign');
+    if(btnResign) {
+        btnResign.onclick = window.handleResign;
+        console.log("4CHESS: Resign listener attached via onclick.");
+    }
+
+    function sendChat() {
+        if (!chatInput || !socket) return;
+        let text = chatInput.value.trim();
+        if (text) {
+            console.log("Sending chat:", text);
+            socket.emit('chat_msg', { text });
+            chatInput.value = '';
+        }
+    }
+
+    if(btnSendChat) btnSendChat.addEventListener('click', sendChat);
+    if(chatInput) chatInput.addEventListener('keypress', (e) => {
+        if(e.key === 'Enter') sendChat();
+    });
+
+    if(chatToggle) chatToggle.addEventListener('click', () => {
+        if(chatWidget) chatWidget.classList.toggle('chat-open');
+    });
+    if(chatClose) chatClose.addEventListener('click', () => {
+        if(chatWidget) chatWidget.classList.remove('chat-open');
+    });
+
+    // Socket Events
+    socket.on('queue_update', (data) => {
+        let qs = document.getElementById('queue-status');
+        if(qs) qs.innerText = `Matchmaking: ${data.count}/4 Players`;
+        let ts = document.getElementById('timer-status');
+        if(ts) ts.innerText = (data.secondsLeft !== undefined ? data.secondsLeft : 15) + 's';
+    });
+
+    socket.on('match_found', (data) => {
+        myColor = data.color;
+        currentRoomId = data.roomId;
+        playerNamesMap = data.playerNames || {};
+        
+        if (myColor === 'black') boardRotation = 180;
+        else if (myColor === 'blue') boardRotation = 270;
+        else if (myColor === 'red') boardRotation = 90;
+        else boardRotation = 0;
+
+        if (boardRotation === 0) panelMap = { white: 'bottom', black: 'top', blue: 'left', red: 'right' };
+        else if (boardRotation === 180) panelMap = { black: 'bottom', white: 'top', red: 'left', blue: 'right' };
+        else if (boardRotation === 270) panelMap = { blue: 'bottom', red: 'top', black: 'left', white: 'right' };
+        else if (boardRotation === 90) panelMap = { red: 'bottom', blue: 'top', white: 'left', black: 'right' };
+
+        if(boardDiv) boardDiv.style.transform = `rotate(${boardRotation}deg)`;
+        initUI();
+        showScreen('game-container');
+    });
+
+    socket.on('init_state', (state) => { if (state.roomId && state.roomId !== currentRoomId) return; syncState(state); });
+    socket.on('state_update', (state) => { if (state.roomId && state.roomId !== currentRoomId) return; syncState(state); });
+
+    function syncState(state) {
+        if (!gameData) gameData = {};
+        if (state.board) gameData.board = state.board;
+        if (state.turnIndex !== undefined) gameData.turnIndex = state.turnIndex;
+        if (state.scores) playerScoresMap = state.scores;
+        if (state.activePlayers) playerActiveMap = state.activePlayers;
+        if (state.playerNames) playerNamesMap = state.playerNames;
+        if (state.gameOver !== undefined) gameData.gameOver = state.gameOver;
+        if (state.winner !== undefined) gameData.winner = state.winner;
+        if (state.lastMove !== undefined) gameData.lastMove = state.lastMove;
+        if (state.turnEndTime !== undefined) turnEndTime = state.turnEndTime;
+        if (statusText && !gameData.gameOver) statusText.innerText = '';
+        updateUI();
+    }
+
+    function inBounds(x, y) {
+        if (x < 3 && y < 3 || x > 10 && y < 3 || x < 3 && y > 10 || x > 10 && y > 10) return false;
+        return x >= 0 && x <= 13 && y >= 0 && y <= 13;
+    }
+
+    function initUI() {
+        cellsDOM = [];
+        if(!boardDiv) return;
+        boardDiv.innerHTML = '';
+        for (let y = 0; y < 14; y++) {
+            let rowDOM = [];
+            for (let x = 0; x < 14; x++) {
+                let cell = document.createElement('div');
+                cell.classList.add('cell');
+                if (!inBounds(x, y)) {
+                    cell.classList.add('dead');
+                } else {
+                    cell.classList.add((x + y) % 2 === 0 ? 'light' : 'dark');
+                }
+                boardDiv.appendChild(cell);
+                rowDOM.push(cell);
+            }
+            cellsDOM.push(rowDOM);
+        }
+    }
+
+    function handleCellClick(x, y) {
+        console.log("Clicked:", x, y, "Turn Index:", gameData.turnIndex, "My Color:", myColor);
+        
+        let turnColor = CHESS_COLORS[gameData.turnIndex];
+        if (turnColor !== myColor) {
+            console.log("NOT YOUR TURN");
+            return;
+        }
+
+        if (selectedCell) {
+            let move = validMovesForSelected.find(m => m.x === x && m.y === y);
+            if (move) {
+                socket.emit('make_move', { fx: selectedCell.x, fy: selectedCell.y, tx: x, ty: y });
+                selectedCell = null; validMovesForSelected = []; updateUI();
+                return;
+            }
+        }
+
+        let piece = gameData.board[y][x].piece;
+        if (piece && piece.color === myColor) {
+            selectedCell = { x, y };
+            if (typeof GameEngine !== 'undefined') {
+                let engine = new GameEngine();
+                engine.board = gameData.board; engine.activePlayers = playerActiveMap;
+                validMovesForSelected = engine.getValidMoves(x, y);
+                console.log("Valid moves count:", validMovesForSelected.length);
+            }
+        } else {
+            selectedCell = null; validMovesForSelected = [];
+        }
+        updateUI();
+    }
+
+    function updateUI() {
+        if (!gameData || !gameData.board) return;
+        
+        // Clear highlights
+        document.querySelectorAll('.cell').forEach(c => c.classList.remove('selected', 'highlight-move', 'has-enemy', 'last-move'));
+        
+        // Update pieces
+        let activePieceIds = new Set();
+        for (let y = 0; y < 14; y++) {
+            for (let x = 0; x < 14; x++) {
+                if (!inBounds(x, y)) continue;
+                let p = gameData.board[y][x].piece;
+                if (p) {
+                    let pid = p.id || `p_${x}_${y}`;
+                    activePieceIds.add(pid);
+                    let pDiv = document.getElementById('piece-' + pid);
+                    if (!pDiv) {
+                        pDiv = document.createElement('div');
+                        pDiv.id = 'piece-' + pid;
+                        pDiv.className = `piece ${p.color}`;
+                        pDiv.style.pointerEvents = 'none'; // CRITICAL: So clicks fall through to BoardDiv
+                        boardDiv.appendChild(pDiv);
+                    }
+                    pDiv.innerText = UNICODE[p.type];
+                    pDiv.style.setProperty('--rot', `rotate(${-boardRotation}deg)`);
+                    pDiv.style.left = `calc(var(--cell-size) * ${x})`;
+                    pDiv.style.top = `calc(var(--cell-size) * ${y})`;
+                    pDiv.classList.toggle('playable', myColor && p.color === myColor && CHESS_COLORS[gameData.turnIndex] === myColor && !gameData.gameOver);
+                }
+            }
+        }
+        document.querySelectorAll('.piece').forEach(el => {
+            if (!activePieceIds.has(el.id.replace('piece-', ''))) el.remove();
+        });
+
+        // Apply visual states to cells
+        if (selectedCell) cellsDOM[selectedCell.y][selectedCell.x].classList.add('selected');
+        validMovesForSelected.forEach(m => {
+            cellsDOM[m.y][m.x].classList.add('highlight-move');
+            if (m.capture) cellsDOM[m.y][m.x].classList.add('has-enemy');
+        });
+        
+        if (gameData.lastMove) {
+            let lm = gameData.lastMove;
+            if (inBounds(lm.fx, lm.fy)) cellsDOM[lm.fy][lm.fx].classList.add('last-move');
+            if (inBounds(lm.tx, lm.ty)) cellsDOM[lm.ty][lm.tx].classList.add('last-move');
+        }
+
+        // Panel updates...
+        let turnColor = CHESS_COLORS[gameData.turnIndex];
+        let turnName = playerNamesMap[turnColor] || COLOR_NAMES[turnColor];
+        const turnNameDOM = document.getElementById('turn-player-name');
+        if (turnNameDOM) {
+            turnNameDOM.innerText = turnName;
+            const webColors = { white: '#22c55e', blue: '#60a5fa', black: '#94a3b8', red: '#f87171' };
+            turnNameDOM.style.color = webColors[turnColor] || 'white';
+        }
+        CHESS_COLORS.forEach(c => {
+            let pos = panelMap[c];
+            let pnl = document.getElementById(`panel-screen-${pos}`);
+            if(!pnl) return;
+            pnl.dataset.color = c;
+            pnl.classList.toggle('active-panel', turnColor === c && !gameData.gameOver);
+            pnl.style.opacity = playerActiveMap[c] === false ? '0.4' : '1';
+            pnl.querySelector('.player-name').innerText = playerNamesMap[c] || COLOR_NAMES[c];
+            pnl.querySelector('.player-score').innerText = `Score: ${playerScoresMap[c] || 0}`;
+            pnl.querySelector('.player-status').innerText = playerActiveMap[c] === false ? 'ELIMINATED' : (turnColor === c ? 'Thinking...' : 'Waiting');
+        });
+
+        if (gameData.gameOver) {
+            let w = gameData.winner;
+            let wt = document.getElementById('winner-text');
+            if(wt) wt.innerText = w ? `Winner: ${playerNamesMap[w]}!` : "Draw!";
+            let gom = document.getElementById('game-over-modal');
+            if(gom) gom.classList.remove('hidden');
+            if(btnResign) btnResign.classList.add('hidden');
+        } else if (myColor && btnResign) {
+            btnResign.classList.remove('hidden');
+        }
+    }
+
+    function loop() {
+        if (turnEndTime > 0 && (!gameData || !gameData.gameOver)) {
+            let left = Math.ceil((turnEndTime - Date.now()) / 1000);
+            if(turnTimerDOM) turnTimerDOM.innerText = `⏳ ${left > 0 ? left : 0}s`;
+        }
+        if (bannedUntil > 0) {
+            let bl = Math.ceil((bannedUntil - Date.now()) / 1000);
+            if (bl > 0 && btnQuick) { btnQuick.innerText = `Banned (${bl}s)`; btnQuick.disabled = true; btnQuick.style.opacity = '0.5'; }
+            else if(btnQuick) { btnQuick.innerText = `Quick Play`; btnQuick.disabled = false; btnQuick.style.opacity = '1'; bannedUntil = 0; }
+        }
+        requestAnimationFrame(loop);
+    }
+    loop();
+
+    socket.on('chat_msg', (data) => {
+        if (data.roomId && data.roomId !== currentRoomId) return;
+        let div = document.createElement('div');
+        div.className = 'chat-entry';
+        div.innerHTML = `<strong class="chat-${data.color}">${data.name}:</strong> <span>${data.text}</span>`;
+        if(chatMessages) { chatMessages.appendChild(div); chatMessages.scrollTop = chatMessages.scrollHeight; }
+    });
+
+    socket.on('leaderboard_res', (list) => {
+        let div = document.getElementById('leaderboard-list');
+        if(!div) return;
+        div.innerHTML = list.length === 0 ? 'No champions yet.' : '';
+        list.forEach((item, index) => {
+            let row = document.createElement('div');
+            row.style.padding = "10px"; row.style.borderBottom = "1px solid #1e293b";
+            row.innerHTML = `<strong>${index+1}.</strong> ${item.name} - <span style="color:#eab308">${item.score}P</span>`;
+            div.appendChild(row);
+        });
+        let mod = document.getElementById('leaderboard-modal');
+        if(mod) mod.classList.remove('hidden');
+    });
+
+    console.log("4CHESS: UI Initialization complete.");
 });

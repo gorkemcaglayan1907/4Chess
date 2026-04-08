@@ -96,18 +96,24 @@ body {
     height: 100vh;
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    padding: 10px;
+    padding: 20px;
     box-sizing: border-box;
+    justify-content: center;
+}
+
+#btn-cancel-queue, #btn-back-to-lobby {
+    margin-top: 15px;
+    width: 100%;
+    cursor: pointer;
 }
 
 #turn-indicator-wrapper {
-    text-align: center;
-    margin-bottom: 5px; /* Reduced to leave space for board on mobile */
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    text-align: left;
     z-index: 50; 
-    position: relative;
-    flex-shrink: 0; /* Prevention from squishing */
+    flex-shrink: 0;
 }
 
 #turn-indicator {
@@ -170,8 +176,8 @@ body {
 /* Absolute offsets to place them specifically BEHIND the players' sides */
 .panel-top { bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 20px; }
 .panel-bottom { top: 100%; left: 50%; transform: translateX(-50%); margin-top: 20px; }
-.panel-left { right: 100%; top: 50%; transform: translateY(-50%); margin-right: 20px; }
-.panel-right { left: 100%; top: 50%; transform: translateY(-50%); margin-left: 20px; }
+.panel-left { right: 100%; top: 50%; transform: translateY(-50%); margin-right: 5px; }
+.panel-right { left: 100%; top: 50%; transform: translateY(-50%); margin-left: 5px; }
 
 .panel-top.active-panel { transform: translateX(-50%) scale(1.15); }
 .panel-bottom.active-panel { transform: translateX(-50%) scale(1.15); }
@@ -298,7 +304,7 @@ body {
     margin: 0;
 }
 
-.piece:hover {
+.piece.playable:hover {
     transform: scale(1.15) var(--rot, rotate(0deg)) !important;
 }
 
@@ -446,53 +452,39 @@ button:active {
 }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-/* Default Chat Toggle State */
-#chat-toggle-btn {
-    display: none;
-}
-
-/* Mobile logic for Chat: Hide by default or make it horizontal top?
- * We'll just make it smaller and transparent on landscape mobile
- */
-@media (max-width: 900px) and (orientation: landscape) {
-    #board-wrapper {
-        margin: 20px 40px; /* Much smaller margin to stop pushing the board down */
-        transform: scale(0.9); /* Scale down slightly if needed to stop squishing */
-    }
-
-    #turn-indicator-wrapper h2 { font-size: 1.2rem; margin-bottom:0; }
-    #game-status-text { display: none; } /* Hide game status to save space */
-    #turn-timer-visual { font-size: 1.1rem !important; margin-top:2px !important; }
-
     #chat-toggle-btn {
         display: block;
         position: fixed;
-        left: 10px;
-        bottom: 10px;
+        left: 20px;
+        bottom: 20px;
         z-index: 200;
         background: var(--color-blue);
         color: white;
         border: none;
-        padding: 8px 16px;
-        border-radius: 20px;
+        padding: 10px 20px;
+        border-radius: 25px;
         font-weight: 800;
         box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+        cursor: pointer;
+        transition: all 0.2s ease;
     }
+    #chat-toggle-btn:hover { transform: scale(1.05); }
 
     #chat-widget {
         display: flex;
         position: fixed;
         top: 0;
-        left: -350px; /* Hidden initially */
+        left: -320px; /* Hidden initially */
         bottom: 0;
         width: 300px;
-        height: 100vh; /* Full height */
-        background: rgba(15, 23, 42, 0.95);
+        height: 100vh;
+        background: rgba(15, 23, 42, 0.98);
         border: none;
         border-right: 2px solid var(--color-blue);
         border-radius: 0;
         z-index: 300;
         transition: left 0.3s ease-in-out;
+        flex-direction: column;
     }
     
     #chat-widget.chat-open {
@@ -500,36 +492,34 @@ button:active {
     }
     
     #chat-close-btn {
-        display: inline-block !important; /* Show close button in mobile */
+        display: block !important;
+        float: right;
     }
 
     #chat-messages {
-        flex-grow: 1; /* Take up remaining height */
+        flex-grow: 1;
         height: auto;
+        overflow-y: auto;
+        padding: 15px;
     }
+
+.cell.last-move::after { content: ''; position: absolute; top:0; left:0; right:0; bottom:0; background-color: rgba(234, 179, 8, 0.6); pointer-events: none; }
+
+.piece.playable { 
+    cursor: pointer; 
+    filter: drop-shadow(0px 0px 5px rgba(255, 255, 255, 0.4));
+    animation: piecePulse 2s infinite ease-in-out;
 }
 
-/* Sound Toggle Button */
-#mute-toggle-btn {
-    position: fixed;
-    top: 15px;
-    right: 15px;
-    z-index: 500;
-    background: rgba(30, 41, 59, 0.8);
-    border: 1px solid rgba(255,255,255,0.1);
-    color: white;
-    border-radius: 50%;
-    width: 45px;
-    height: 45px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 1.3rem;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.5);
-    padding: 0;
+@keyframes piecePulse {
+    0% { filter: drop-shadow(0px 0px 5px rgba(255, 255, 255, 0.4)); transform: scale(1) var(--rot, rotate(0deg)); }
+    50% { filter: drop-shadow(0px 0px 10px rgba(255, 255, 255, 0.8)); transform: scale(1.05) var(--rot, rotate(0deg)); }
+    100% { filter: drop-shadow(0px 0px 5px rgba(255, 255, 255, 0.4)); transform: scale(1) var(--rot, rotate(0deg)); }
 }
 
-.cell.last-move::after { content: ''; position: absolute; top:0; left:0; right:0; bottom:0; background-color: rgba(234, 179, 8, 0.4); pointer-events: none; }
-
-.piece.playable { cursor: pointer; }
-.piece.playable:hover { filter: drop-shadow(0px 0px 8px rgba(255, 255, 255, 0.9)) brightness(1.3); z-index: 20; }
+.piece.playable:hover { 
+    filter: drop-shadow(0px 0px 12px rgba(255, 255, 255, 1)) brightness(1.2); 
+    transform: scale(1.15) var(--rot, rotate(0deg)) !important;
+    z-index: 30;
+    animation: none; /* Stop pulsing on hover for precision */
+}
