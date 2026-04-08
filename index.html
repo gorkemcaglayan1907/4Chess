@@ -15,6 +15,9 @@
         <p style="font-size: 1rem; color: #94a3b8; font-weight: normal; margin-top: 10px;">En iyi oyun deneyimi için cihazınız yan konumda olmalıdır.</p>
     </div>
     
+    <!-- Sound Toggle Button -->
+    <button id="mute-toggle-btn">🔊</button>
+    
     <!-- Login Screen -->
     <div id="login-screen">
         <div class="modal-content">
@@ -32,7 +35,7 @@
         <div class="modal-content">
             <h2>Eşleştirme Bekleniyor 🔍</h2>
             <div id="queue-status" style="font-size:1.2rem; font-weight:600; color:var(--board-light);">Bağlanılıyor...</div>
-            <div id="timer-status" style="font-size:2rem; font-weight:800; color:var(--color-red); margin-top:10px;">30dk</div>
+            <div id="timer-status" style="font-size:2rem; font-weight:800; color:var(--color-red); margin-top:10px;">15sn</div>
             <div class="spinner"></div>
             <p class="small-text" style="color:#64748b; margin-top:20px; font-size:0.85rem;">Süre dolduğunda boş koltuklara botlar eklenecek.</p>
         </div>
@@ -83,9 +86,15 @@
         </div>
     </div>
 
+    <!-- Mobile Chat Toggle Button -->
+    <button id="chat-toggle-btn">💬 Sohbet</button>
+
     <!-- Chat UI -->
     <div id="chat-widget">
-        <div id="chat-header">Oyun Sohbeti</div>
+        <div id="chat-header">
+            Oyun Sohbeti
+            <span id="chat-close-btn" style="position:absolute; right:15px; cursor:pointer; font-size:1.2rem; display:none;">✕</span>
+        </div>
         <div id="chat-messages"></div>
         <div id="chat-input-area">
             <input type="text" id="chat-input" placeholder="Mesajınız..." maxlength="60">

@@ -11,7 +11,7 @@ app.use(express.static(__dirname));
 
 let waitingQueue = []; 
 let queueTimeoutInterval = null;
-let secondsLeft = 30;
+let secondsLeft = 15;
 
 let rooms = {}; 
 let userRooms = {}; 
@@ -71,7 +71,7 @@ function processQueue(forceStart = false) {
 
         rooms[roomId] = { game, players, playerNames, playerFlags, bots, turnTimer: null, turnEndTime: 0 };
         
-        secondsLeft = 30; // Sonraki sıra için reset
+        secondsLeft = 15; // Sonraki sıra için reset
         startTurnTimer(roomId);
         startGameLoop(roomId);
         
@@ -79,7 +79,7 @@ function processQueue(forceStart = false) {
     } else {
         // Bekleyen sayısı 4 ten azsa Timer'i aktifleştir
         if (!queueTimeoutInterval && waitingQueue.length > 0) {
-            secondsLeft = 30;
+            secondsLeft = 15;
             queueTimeoutInterval = setInterval(() => {
                 secondsLeft--;
                 broadcastQueueUpdate();

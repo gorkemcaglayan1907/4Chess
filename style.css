@@ -10,7 +10,8 @@
     --color-black: #1e293b;
     --color-red: #ef4444;
 
-    --cell-size: min(calc(100vw / 15), 45px); /* Max 45px per cell to fit on desktop, scales on mobile */
+    /* Make the cell size adapt to both width AND height so it never overflows vertically */
+    --cell-size: min(calc(100vw / 18), calc(100vh / 24), 38px); 
     
     --glass-bg: rgba(30, 41, 59, 0.7);
     --glass-border: rgba(255, 255, 255, 0.1);
@@ -98,11 +99,15 @@ body {
     justify-content: center;
     align-items: center;
     padding: 10px;
+    box-sizing: border-box;
 }
 
 #turn-indicator-wrapper {
     text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: 5px; /* Reduced to leave space for board on mobile */
+    z-index: 50; 
+    position: relative;
+    flex-shrink: 0; /* Prevention from squishing */
 }
 
 #turn-indicator {
@@ -122,7 +127,8 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    margin: 90px 40px; /* Add margin to create physical space for absolute panels outside */
+    margin: 40px 40px; /* Slightly reduced margins to help centering */
+    flex-shrink: 1;
 }
 
 #chess-board {
@@ -440,20 +446,85 @@ button:active {
 }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
+/* Default Chat Toggle State */
+#chat-toggle-btn {
+    display: none;
+}
+
 /* Mobile logic for Chat: Hide by default or make it horizontal top?
  * We'll just make it smaller and transparent on landscape mobile
  */
 @media (max-width: 900px) and (orientation: landscape) {
-    #chat-widget {
-        bottom: 5px;
-        left: 5px;
-        width: 220px;
-        background: rgba(15, 23, 42, 0.4);
+    #board-wrapper {
+        margin: 20px 40px; /* Much smaller margin to stop pushing the board down */
+        transform: scale(0.9); /* Scale down slightly if needed to stop squishing */
     }
-    #chat-header { padding: 4px; font-size: 0.7rem; background: rgba(30, 41, 59, 0.5); }
-    #chat-messages { height: 90px; }
-    #chat-input-area { padding: 4px; }
-    #chat-input { padding: 4px 6px; font-size: 0.75rem; }
-    #btn-send-chat { padding: 4px 8px; font-size: 0.75rem; }
-    .chat-entry { padding: 4px 6px; font-size: 0.75rem; }
+
+    #turn-indicator-wrapper h2 { font-size: 1.2rem; margin-bottom:0; }
+    #game-status-text { display: none; } /* Hide game status to save space */
+    #turn-timer-visual { font-size: 1.1rem !important; margin-top:2px !important; }
+
+    #chat-toggle-btn {
+        display: block;
+        position: fixed;
+        left: 10px;
+        bottom: 10px;
+        z-index: 200;
+        background: var(--color-blue);
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-weight: 800;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+    }
+
+    #chat-widget {
+        display: flex;
+        position: fixed;
+        top: 0;
+        left: -350px; /* Hidden initially */
+        bottom: 0;
+        width: 300px;
+        height: 100vh; /* Full height */
+        background: rgba(15, 23, 42, 0.95);
+        border: none;
+        border-right: 2px solid var(--color-blue);
+        border-radius: 0;
+        z-index: 300;
+        transition: left 0.3s ease-in-out;
+    }
+    
+    #chat-widget.chat-open {
+        left: 0;
+    }
+    
+    #chat-close-btn {
+        display: inline-block !important; /* Show close button in mobile */
+    }
+
+    #chat-messages {
+        flex-grow: 1; /* Take up remaining height */
+        height: auto;
+    }
+}
+
+/* Sound Toggle Button */
+#mute-toggle-btn {
+    position: fixed;
+    top: 15px;
+    right: 15px;
+    z-index: 500;
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: white;
+    border-radius: 50%;
+    width: 45px;
+    height: 45px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.3rem;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+    padding: 0;
 }

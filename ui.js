@@ -4,6 +4,8 @@ const audioMove = new Audio('https://upload.wikimedia.org/wikipedia/commons/4/43
 const audioCapture = new Audio('https://upload.wikimedia.org/wikipedia/commons/e/e0/Chess_capture.ogg');
 const audioEnd = new Audio('https://upload.wikimedia.org/wikipedia/commons/d/d4/Chess_checkmate.ogg');
 
+let soundEnabled = true;
+
 
 const UNICODE = {
     king: '♚\uFE0E', queen: '♛\uFE0E', rook: '♜\uFE0E', bishop: '♝\uFE0E', knight: '♞\uFE0E', pawn: '♟\uFE0E'
@@ -275,12 +277,14 @@ function updateUI() {
     });
 
     if (window.lastTurnIndex !== undefined && window.lastTurnIndex !== game.turnIndex) {
-        if (deletedCount > 0) {
-            audioCapture.currentTime = 0;
-            audioCapture.play().catch(e => {});
-        } else {
-            audioMove.currentTime = 0;
-            audioMove.play().catch(e => {});
+        if (soundEnabled) {
+            if (deletedCount > 0) {
+                audioCapture.currentTime = 0;
+                audioCapture.play().catch(e => {});
+            } else {
+                audioMove.currentTime = 0;
+                audioMove.play().catch(e => {});
+            }
         }
     }
     window.lastTurnIndex = game.turnIndex;
@@ -337,8 +341,10 @@ function updateUI() {
         statusText.innerText = "Oyun Bitti";
         
         if (window.lastGameOver !== true) {
-            audioEnd.currentTime = 0;
-            audioEnd.play().catch(e => {});
+            if (soundEnabled) {
+                audioEnd.currentTime = 0;
+                audioEnd.play().catch(e => {});
+            }
             window.lastGameOver = true;
         }
     }
@@ -367,9 +373,27 @@ function renderTimer() {
 requestAnimationFrame(renderTimer);
 
 // CHAT SYSTEM LOGIC
+const chatWidget = document.getElementById('chat-widget');
 const chatInput = document.getElementById('chat-input');
 const btnSendChat = document.getElementById('btn-send-chat');
 const chatMessages = document.getElementById('chat-messages');
+
+// Mobile Toggle Listeners
+document.getElementById('chat-toggle-btn').addEventListener('click', () => {
+    chatWidget.classList.add('chat-open');
+});
+document.getElementById('chat-close-btn').addEventListener('click', () => {
+    chatWidget.classList.remove('chat-open');
+});
+
+// Sound Toggle Listener
+const muteBtn = document.getElementById('mute-toggle-btn');
+if (muteBtn) {
+    muteBtn.addEventListener('click', () => {
+        soundEnabled = !soundEnabled;
+        muteBtn.innerText = soundEnabled ? '🔊' : '🔇';
+    });
+}
 
 function sendChatMessage() {
     let text = chatInput.value.trim();
