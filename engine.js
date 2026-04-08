@@ -399,6 +399,13 @@ class GameEngine {
 
         this.board[ty][tx].piece = piece;
         this.board[fy][fx].piece = null;
+
+        // EĞER ŞAH YENİLDİYSE: Oyuncuyu ele ve taşlarını dondur (Gri yap)
+        if (targetPiece && targetPiece.type === PIECES.KING) {
+            this.activePlayers[targetPiece.color] = false;
+            this.scores[piece.color] += PIECE_VALUES.king; // Şahı yiyene büyük puan
+            this.checkWinCondition();
+        }
         
         let promoted = false;
         // Check promotion
@@ -419,10 +426,7 @@ class GameEngine {
         for (let c of CHESS_COLORS) {
             if (this.activePlayers[c] && this.hasOnlyKing(c)) {
                 this.activePlayers[c] = false;
-                if (c !== piece.color) {
-                    this.scores[piece.color] += PIECE_VALUES.king; // Son taşı yiyene ödül
-                }
-                // this.removePiecesOfColor(c); // Artık donduruyoruz
+                // Şahı yiyen yok, kendi kendine elendiği için bonus puan dağıtılmıyor (veya son hamle yapan kazanır kuralı eklenebilir)
                 this.checkWinCondition();
             }
         }
