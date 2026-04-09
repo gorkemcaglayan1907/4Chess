@@ -3,7 +3,7 @@ const PIECES = {
     PAWN: 'pawn', ROOK: 'rook', KNIGHT: 'knight', BISHOP: 'bishop', QUEEN: 'queen', KING: 'king'
 };
 const PIECE_VALUES = {
-    pawn: 1, knight: 2, bishop: 3, rook: 4, queen: 8, king: 20
+    pawn: 1, knight: 3, bishop: 3.5, rook: 5, queen: 9, king: 100
 };
 
 class GameEngine {
@@ -117,10 +117,8 @@ class GameEngine {
             // Find who gets the 20 points for the King. We check who is actually attacking the king.
             let attacker = this.getAttackerOfKing(eliminatedColor);
             if (attacker) {
-                this.scores[attacker] += PIECE_VALUES.king;
+                this.scores[attacker] += 20; // 20 points for eliminating a king
             }
-            
-            // this.removePiecesOfColor(eliminatedColor); // Artık donduruyoruz
             
             // Re-evaluate win condition
             this.checkWinCondition();
@@ -321,9 +319,8 @@ class GameEngine {
 
     isCheck(color, b = this.board) {
         const kpos = this.findKing(color, b);
-        if (!kpos) return false; // If no king exists (maybe eliminated), not in check
+        if (!kpos) return false; 
 
-        // Check if any opponent piece can hit king
         for (let c of CHESS_COLORS) {
             if (!this.isAlly(c, color) && this.activePlayers[c]) {
                 for (let y = 0; y < 14; y++) {
@@ -347,7 +344,6 @@ class GameEngine {
     isCheckmate(color, b = this.board) {
         if (!this.isCheck(color, b)) return false;
 
-        // Has any valid moves left?
         for (let y = 0; y < 14; y++) {
             for (let x = 0; x < 14; x++) {
                 if (this.inBounds(x, y)) {
@@ -362,7 +358,6 @@ class GameEngine {
         return true;
     }
 
-    // Helper to find who is attacking the king to award points
     getAttackerOfKing(color, b = this.board) {
         const kpos = this.findKing(color, b);
         if (!kpos) return null;
@@ -375,7 +370,7 @@ class GameEngine {
                             if (p && p.color === c) {
                                 let ops = this.getRawMoves(x, y, b);
                                 if (ops.some(m => m.x === kpos.x && m.y === kpos.y)) {
-                                    return c; // Returning the first color found attacking the king
+                                    return c;
                                 }
                             }
                         }
@@ -383,14 +378,13 @@ class GameEngine {
                 }
             }
         }
-        return null; // Should not happen if they are checkmated
+        return null;
     }
 
     movePiece(fx, fy, tx, ty) {
         let piece = this.board[fy][fx].piece;
         let targetPiece = this.board[ty][tx].piece;
         
-        // Add score if capturing something
         if (targetPiece) {
             if (this.activePlayers[targetPiece.color]) {
                 this.scores[piece.color] += PIECE_VALUES[targetPiece.type];
@@ -400,15 +394,13 @@ class GameEngine {
         this.board[ty][tx].piece = piece;
         this.board[fy][fx].piece = null;
 
-        // EĞER ŞAH YENİLDİYSE: Oyuncuyu ele ve taşlarını dondur (Gri yap)
         if (targetPiece && targetPiece.type === PIECES.KING) {
             this.activePlayers[targetPiece.color] = false;
-            this.scores[piece.color] += PIECE_VALUES.king; // Şahı yiyene büyük puan
+            this.scores[piece.color] += 20; 
             this.checkWinCondition();
         }
         
         let promoted = false;
-        // Check promotion
         if (piece.type === PIECES.PAWN) {
             let reachedEnd = false;
             if (piece.color === 'white' && ty === 0) reachedEnd = true;
@@ -417,45 +409,75 @@ class GameEngine {
             if (piece.color === 'red' && tx === 0) reachedEnd = true;
 
             if (reachedEnd) {
-                piece.type = PIECES.QUEEN; // otomatik vezir
+                piece.type = PIECES.QUEEN;
                 promoted = true;
             }
         }
 
-        // Yeni Kural: Sadece Şahı kalan oyuncuları anında ele.
+        // Auto-eliminate kingless
         for (let c of CHESS_COLORS) {
             if (this.activePlayers[c] && this.hasOnlyKing(c)) {
                 this.activePlayers[c] = false;
-                // Şahı yiyen yok, kendi kendine elendiği için bonus puan dağıtılmıyor (veya son hamle yapan kazanır kuralı eklenebilir)
                 this.checkWinCondition();
             }
         }
 
-        // Complete the turn automatically if not Game Over logic
         this.lastMove = { fx, fy, tx, ty };
         this.nextTurn();
-        return { success: true, promoted };
+        return { success: true, promoted, capture: !!targetPiece };
     }
 
     evaluateBoard(b, color) {
         let score = 0;
+        const myActive = this.activePlayers[color];
+        if (!myActive) return -9999;
+
         for (let y = 0; y < 14; y++) {
             for (let x = 0; x < 14; x++) {
                 if (this.inBounds(x, y)) {
                     let p = b[y][x].piece;
                     if (p) {
-                        let val = PIECE_VALUES[p.type] * 10;
+                        let val = PIECE_VALUES[p.type];
                         if (p.color === color) {
-                            score += val;
-                            // Merkezi pozisyon kontrolü bonusu
-                            if (x >= 4 && x <= 9 && y >= 4 && y <= 9) score += 0.5;
-                        } else {
-                            score -= val;
+                            score += val * 10;
+                            
+                            // Center control
+                            if (x >= 4 && x <= 9 && y >= 4 && y <= 9) score += 2;
+                            
+                            // Pawn advancement
+                            if (p.type === PIECES.PAWN) {
+                                if (color === 'white') score += (12 - y) * 0.1;
+                                if (color === 'black') score += (y - 1) * 0.1;
+                                if (color === 'blue') score += (x - 1) * 0.1;
+                                if (color === 'red') score += (12 - x) * 0.1;
+                            }
+                        } else if (!this.isAlly(p.color, color)) {
+                            // Being in check is bad
+                            if (p.type === PIECES.KING) {
+                                // If I am checking them, bonus
+                                let myPiecesAttackingKing = false;
+                                // ... simplified check detection ...
+                            }
+                            // Only penalize if the opponent is still active
+                            if (this.activePlayers[p.color]) {
+                                score -= val * 10;
+                            }
                         }
                     }
                 }
             }
         }
+
+        // Critical: Checking others is good
+        for (let c of CHESS_COLORS) {
+            if (!this.isAlly(c, color) && this.activePlayers[c]) {
+                if (this.isCheck(c, b)) {
+                    score += 15; // Bonus for checking an opponent
+                    if (this.isCheckmate(c, b)) score += 100; // Major bonus for mate
+                }
+            }
+        }
+
         return score;
     }
 
@@ -480,6 +502,9 @@ class GameEngine {
 
         if (validMovesList.length === 0) return null;
 
+        // Current board threats
+        const currentThreats = this.getThreatMap(color, this.board);
+
         for (let move of validMovesList) {
             let nextB = this.cloneBoard(this.board);
             let targetPiece = nextB[move.ty][move.tx].piece;
@@ -490,35 +515,31 @@ class GameEngine {
             
             let score = this.evaluateBoard(nextB, color);
 
-            // Yakalama bonusu
+            // Capture bonus (Greedy)
             if (targetPiece) {
-                score += (PIECE_VALUES[targetPiece.type] * 10) + 5;
+                // Only give bonus if target player is still in the game
+                if (this.activePlayers[targetPiece.color]) {
+                    score += (PIECE_VALUES[targetPiece.type] * 12) + 5;
+                } else {
+                    // Very small bonus to clear dead pieces if literally nothing else to do
+                    score += 0.1;
+                }
             }
             
-            // Tehdit analizi (Basit 1-ply: o anki kare başka biri tarafından tehdit ediliyor mu?)
-            let inDanger = false;
-            for (let y2 = 0; y2 < 14; y2++) {
-                for (let x2 = 0; x2 < 14; x2++) {
-                    if (this.inBounds(x2, y2)) {
-                        let op = nextB[y2][x2].piece;
-                        if (op && !this.isAlly(op.color, color) && this.activePlayers[op.color]) {
-                            let opMoves = this.getRawMoves(x2, y2, nextB);
-                            if (opMoves.some(m => m.x === move.tx && m.y === move.ty)) {
-                                inDanger = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-                if (inDanger) break;
+            // Threat detection at destination
+            let destThreatMap = this.getThreatMap(color, nextB);
+            if (destThreatMap[move.ty][move.tx]) {
+                // Moving into danger penalty
+                score -= (PIECE_VALUES[movingPiece.type] * 15);
             }
 
-            if (inDanger) {
-                score -= (PIECE_VALUES[movingPiece.type] * 10) + 1;
+            // Rescue bonus: If piece was under threat and now it's not (and destination is safe)
+            if (currentThreats[move.fy][move.fx] && !destThreatMap[move.ty][move.tx]) {
+                score += (PIECE_VALUES[movingPiece.type] * 8);
             }
             
-            // Çeşitlilik
-            score += Math.random();
+            // Small randomness to avoid identical games
+            score += Math.random() * 0.5;
 
             if (score > bestScore) {
                 bestScore = score;
@@ -528,10 +549,31 @@ class GameEngine {
         
         return bestMove;
     }
+
+    getThreatMap(color, b) {
+        let threats = Array.from({length: 14}, () => Array(14).fill(false));
+        for (let c of CHESS_COLORS) {
+            if (!this.isAlly(c, color) && this.activePlayers[c]) {
+                for (let y = 0; y < 14; y++) {
+                    for (let x = 0; x < 14; x++) {
+                        if (this.inBounds(x, y)) {
+                            let p = b[y][x].piece;
+                            if (p && p.color === c) {
+                                let ops = this.getRawMoves(x, y, b);
+                                for (let m of ops) {
+                                    threats[m.y][m.x] = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return threats;
+    }
 }
 
 
-// Make compatible with Node.js
 if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {
     module.exports = { GameEngine, CHESS_COLORS, PIECES, PIECE_VALUES };
 }

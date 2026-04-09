@@ -72,27 +72,31 @@ window.addEventListener('DOMContentLoaded', () => {
         if(target) target.classList.remove('hidden');
     }
 
-    // Main Click Handler (Unified)
-    if (boardDiv) {
-        boardDiv.addEventListener('mousedown', (e) => {
-            if (!gameData || gameData.gameOver || !myColor) return;
-            
-            const rect = boardDiv.getBoundingClientRect();
-            const cellSize = rect.width / 14;
-            let rawX = Math.floor((e.clientX - rect.left) / cellSize);
-            let rawY = Math.floor((e.clientY - rect.top) / cellSize);
-            
-            if (rawX < 0 || rawX > 13 || rawY < 0 || rawY > 13) return;
-            handleCellClick(rawX, rawY);
-        });
-    }
-
     const btnQuick = document.getElementById('btn-quick-play');
     if (btnQuick) {
         btnQuick.addEventListener('click', () => {
+            if (window.audio) window.audio.unlock();
             let name = saveName();
             socket.emit('join_queue', { username: name, flag: 'us' });
             showScreen('lobby-screen');
+        });
+    }
+
+    const btnCreate = document.getElementById('btn-create-room');
+    if (btnCreate) {
+        btnCreate.addEventListener('click', () => {
+            if (window.audio) window.audio.unlock();
+            let name = saveName();
+            socket.emit('create_room', { name, flag: 'us' });
+            showScreen('lobby-screen');
+        });
+    }
+
+    const btnJoinPrompt = document.getElementById('btn-join-room-prompt');
+    if (btnJoinPrompt) {
+        btnJoinPrompt.addEventListener('click', () => {
+            if (window.audio) window.audio.unlock();
+            document.getElementById('join-room-container').classList.toggle('hidden');
         });
     }
 
@@ -105,12 +109,12 @@ window.addEventListener('DOMContentLoaded', () => {
     if(btnLeaderboard) btnLeaderboard.addEventListener('click', () => socket.emit('get_leaderboard'));
     window.handleResign = () => {
         console.log("4CHESS: handleResign triggered!");
-        if (confirm("Are you sure you want to resign and leave?")) {
-            console.log("4CHESS: Resign confirmed, emitting...");
-            socket.emit('resign');
-            alert("Resigned! Returning to lobby.");
+        // Simplified for reliability across browser environments
+        console.log("4CHESS: Resign emitting...");
+        socket.emit('resign');
+        setTimeout(() => {
             location.reload();
-        }
+        }, 500);
     };
     const btnResign = document.getElementById('btn-resign');
     if(btnResign) {
@@ -134,7 +138,12 @@ window.addEventListener('DOMContentLoaded', () => {
     });
 
     if(chatToggle) chatToggle.addEventListener('click', () => {
-        if(chatWidget) chatWidget.classList.toggle('chat-open');
+        if(chatWidget) {
+            chatWidget.classList.toggle('chat-open');
+            if(chatWidget.classList.contains('chat-open')) {
+                chatToggle.classList.remove('has-unread');
+            }
+        }
     });
     if(chatClose) chatClose.addEventListener('click', () => {
         if(chatWidget) chatWidget.classList.remove('chat-open');
@@ -145,7 +154,12 @@ window.addEventListener('DOMContentLoaded', () => {
         let qs = document.getElementById('queue-status');
         if(qs) qs.innerText = `Matchmaking: ${data.count}/4 Players`;
         let ts = document.getElementById('timer-status');
-        if(ts) ts.innerText = (data.secondsLeft !== undefined ? data.secondsLeft : 15) + 's';
+        if(ts) ts.innerText = (data.secondsLeft !== undefined ? data.secondsLeft : 5) + 's';
+    });
+
+    socket.on('ban_status', (data) => {
+        bannedUntil = data.until;
+        console.log("Ban status received:", data);
     });
 
     socket.on('match_found', (data) => {
@@ -164,6 +178,8 @@ window.addEventListener('DOMContentLoaded', () => {
         else if (boardRotation === 90) panelMap = { red: 'bottom', blue: 'top', white: 'left', black: 'right' };
 
         if(boardDiv) boardDiv.style.transform = `rotate(${boardRotation}deg)`;
+        const ct = document.getElementById('chat-toggle-btn');
+        if(ct) ct.classList.remove('hidden');
         initUI();
         showScreen('game-container');
     });
@@ -173,6 +189,16 @@ window.addEventListener('DOMContentLoaded', () => {
 
     function syncState(state) {
         if (!gameData) gameData = {};
+        
+        let moveChanged = false;
+        if (state.lastMove && (!gameData.lastMove || 
+            state.lastMove.fx !== gameData.lastMove.fx || 
+            state.lastMove.fy !== gameData.lastMove.fy ||
+            state.lastMove.tx !== gameData.lastMove.tx ||
+            state.lastMove.ty !== gameData.lastMove.ty)) {
+            moveChanged = true;
+        }
+
         if (state.board) gameData.board = state.board;
         if (state.turnIndex !== undefined) gameData.turnIndex = state.turnIndex;
         if (state.scores) playerScoresMap = state.scores;
@@ -183,6 +209,14 @@ window.addEventListener('DOMContentLoaded', () => {
         if (state.lastMove !== undefined) gameData.lastMove = state.lastMove;
         if (state.turnEndTime !== undefined) turnEndTime = state.turnEndTime;
         if (statusText && !gameData.gameOver) statusText.innerText = '';
+
+        if (moveChanged && window.audio) {
+            if (state.gameOver) window.audio.playGameOver();
+            else if (state.check) window.audio.playCheck();
+            else if (state.capture) window.audio.playCapture();
+            else window.audio.playMove();
+        }
+
         updateUI();
     }
 
@@ -204,6 +238,11 @@ window.addEventListener('DOMContentLoaded', () => {
                     cell.classList.add('dead');
                 } else {
                     cell.classList.add((x + y) % 2 === 0 ? 'light' : 'dark');
+                    // DIRECT CELL CLICK LISTENER (Robust against rotation)
+                    cell.addEventListener('mousedown', () => {
+                        if (!gameData || gameData.gameOver || !myColor) return;
+                        handleCellClick(x, y);
+                    });
                 }
                 boardDiv.appendChild(cell);
                 rowDOM.push(cell);
@@ -213,6 +252,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleCellClick(x, y) {
+        if (window.audio) window.audio.unlock();
         console.log("Clicked:", x, y, "Turn Index:", gameData.turnIndex, "My Color:", myColor);
         
         let turnColor = CHESS_COLORS[gameData.turnIndex];
@@ -273,6 +313,10 @@ window.addEventListener('DOMContentLoaded', () => {
                     pDiv.style.left = `calc(var(--cell-size) * ${x})`;
                     pDiv.style.top = `calc(var(--cell-size) * ${y})`;
                     pDiv.classList.toggle('playable', myColor && p.color === myColor && CHESS_COLORS[gameData.turnIndex] === myColor && !gameData.gameOver);
+                    
+                    // ELIMINATED PIECE LOGIC
+                    let isEliminated = playerActiveMap[p.color] === false;
+                    pDiv.classList.toggle('eliminated-piece', isEliminated);
                 }
             }
         }
@@ -321,6 +365,8 @@ window.addEventListener('DOMContentLoaded', () => {
             let gom = document.getElementById('game-over-modal');
             if(gom) gom.classList.remove('hidden');
             if(btnResign) btnResign.classList.add('hidden');
+            const ct = document.getElementById('chat-toggle-btn');
+            if(ct) ct.classList.add('hidden');
         } else if (myColor && btnResign) {
             btnResign.classList.remove('hidden');
         }
@@ -333,8 +379,18 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         if (bannedUntil > 0) {
             let bl = Math.ceil((bannedUntil - Date.now()) / 1000);
-            if (bl > 0 && btnQuick) { btnQuick.innerText = `Banned (${bl}s)`; btnQuick.disabled = true; btnQuick.style.opacity = '0.5'; }
-            else if(btnQuick) { btnQuick.innerText = `Quick Play`; btnQuick.disabled = false; btnQuick.style.opacity = '1'; bannedUntil = 0; }
+            if (bl > 0) {
+                if (btnQuick) { btnQuick.innerText = `Banned (${bl}s)`; btnQuick.disabled = true; btnQuick.style.opacity = '0.5'; }
+                if (btnCreate) { btnCreate.innerText = `Banned (${bl}s)`; btnCreate.disabled = true; btnCreate.style.opacity = '0.5'; }
+                const btnJoin = document.getElementById('btn-join-room-prompt');
+                if (btnJoin) { btnJoin.innerText = `Banned`; btnJoin.disabled = true; btnJoin.style.opacity = '0.5'; }
+            } else {
+                if (btnQuick) { btnQuick.innerText = `Quick Play`; btnQuick.disabled = false; btnQuick.style.opacity = '1'; }
+                if (btnCreate) { btnCreate.innerText = `Create Room`; btnCreate.disabled = false; btnCreate.style.opacity = '1'; }
+                const btnJoin = document.getElementById('btn-join-room-prompt');
+                if (btnJoin) { btnJoin.innerText = `Join Room`; btnJoin.disabled = false; btnJoin.style.opacity = '1'; }
+                bannedUntil = 0;
+            }
         }
         requestAnimationFrame(loop);
     }
@@ -345,7 +401,15 @@ window.addEventListener('DOMContentLoaded', () => {
         let div = document.createElement('div');
         div.className = 'chat-entry';
         div.innerHTML = `<strong class="chat-${data.color}">${data.name}:</strong> <span>${data.text}</span>`;
-        if(chatMessages) { chatMessages.appendChild(div); chatMessages.scrollTop = chatMessages.scrollHeight; }
+        if(chatMessages) { 
+            chatMessages.appendChild(div); 
+            chatMessages.scrollTop = chatMessages.scrollHeight; 
+        }
+
+        // UNREAD NOTIFICATION LOGIC
+        if (chatWidget && !chatWidget.classList.contains('chat-open')) {
+            if (chatToggle) chatToggle.classList.add('has-unread');
+        }
     });
 
     socket.on('leaderboard_res', (list) => {
@@ -361,6 +425,11 @@ window.addEventListener('DOMContentLoaded', () => {
         let mod = document.getElementById('leaderboard-modal');
         if(mod) mod.classList.remove('hidden');
     });
+
+    // Global Unlock for Mobile
+    document.addEventListener('touchstart', () => {
+        if (window.audio) window.audio.unlock();
+    }, { once: true });
 
     console.log("4CHESS: UI Initialization complete.");
 });

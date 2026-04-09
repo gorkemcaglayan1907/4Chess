@@ -16,26 +16,24 @@
     </div>
     
 
-    <!-- Login & Main Menu Screen -->
     <div id="login-screen">
-        <div class="modal-content" style="max-width: 400px; width: 100%;">
-            <h1 style="color:var(--color-blue); margin-bottom:5px;">4CHESS</h1>
-            <p style="margin-bottom:20px; color:#94a3b8;">Join the epic multiplayer chess experience</p>
+        <div class="modal-content">
+            <h1 style="color:var(--color-blue); margin-bottom:25px; font-size: 2.5rem;">4CHESS</h1>
             
-            <input type="text" id="username-input" placeholder="Your Player Name" maxlength="15" style="margin-bottom: 20px;">
+            <input type="text" id="username-input" placeholder="Your Player Name" maxlength="15">
             
-            <div id="menu-actions" style="display:flex; flex-direction:column; gap:10px;">
-                <button id="btn-quick-play" style="background-color: var(--color-blue);">Quick Play</button>
+            <div id="menu-actions" style="display:flex; flex-direction:column; gap:12px;">
+                <button id="btn-quick-play" class="btn-blue">Quick Play</button>
                 <div style="display:flex; gap:10px;">
-                    <button id="btn-create-room" style="background-color: var(--color-red); flex:1;">Create Room</button>
-                    <button id="btn-join-room-prompt" style="background-color: var(--board-dark); flex:1;">Join Room</button>
+                    <button id="btn-create-room" class="btn-red" style="flex:1;">Create Room</button>
+                    <button id="btn-join-room-prompt" class="btn-dark" style="flex:1;">Join Room</button>
                 </div>
-                <button id="btn-leaderboard" style="background-color: #eab308; color: #000;">🏆 Leaderboard</button>
+                <button id="btn-leaderboard" class="btn-gold">🏆 Leaderboard</button>
             </div>
             
-            <div id="join-room-container" class="hidden" style="margin-top:20px; padding-top:20px; border-top:1px solid var(--glass-border);">
-                <input type="text" id="room-code-input" placeholder="Room Code" maxlength="4" style="text-transform:uppercase; text-align:center; font-size:1.5rem; letter-spacing: 5px;">
-                <button id="btn-join-room" style="width:100%; margin-top:10px;">Connect</button>
+            <div id="join-room-container" class="hidden" style="margin-top:20px; padding-top:20px; border-top:1px solid #334155;">
+                <input type="text" id="room-code-input" placeholder="CODE" maxlength="4">
+                <button id="btn-join-room" class="btn-blue">Connect</button>
             </div>
         </div>
     </div>
@@ -48,7 +46,7 @@
             <div id="timer-status" style="font-size:2rem; font-weight:800; color:var(--color-red); margin-top:10px;"></div>
             <div class="spinner"></div>
             <div id="cancel-queue-container">
-                <button id="btn-cancel-queue" style="background:var(--color-red); margin-top:10px;">Cancel</button>
+                <button id="btn-cancel-queue" class="btn-red" style="margin-top:10px;">Cancel</button>
             </div>
             <p class="small-text" style="color:#64748b; margin-top:20px; font-size:0.85rem;">Bots will take empty seats when time's up.</p>
         </div>
@@ -60,11 +58,13 @@
             <div>
                 <h2 id="turn-indicator">Turn: <span id="turn-player-name">...</span></h2>
                 <p id="game-status-text">Waiting for game...</p>
-                <div id="turn-timer-visual" style="font-size: 1.5rem; font-weight: 800; color: #f59e0b; margin-top: 5px;"></div>
             </div>
         </div>
+        
+        <!-- LARGE TIMER ON THE LEFT -->
+        <div id="turn-timer-visual"></div>
 
-        <button id="btn-resign" style="position:fixed; top:20px; right: 15px; z-index: 2000; background:var(--color-red); color:var(--color-white); border:none; padding: 12px 20px; border-radius:8px; font-weight:800; cursor:pointer;" class="hidden">🏳️ Resign</button>
+        <button id="btn-resign" class="btn-red hidden">🏳️ Resign</button>
 
         <div id="board-wrapper">
             <!-- Screen HUDs -->
@@ -94,18 +94,18 @@
                 <span class="player-score">...</span>
             </div>
         </div>
+
+        <!-- Mobile Chat Toggle Button -->
+        <button id="chat-toggle-btn" class="hidden">💬 Chat</button>
     </div>
 
     <div id="game-over-modal" class="hidden">
         <div class="modal-content">
-            <h2 id="winner-text">Game Over!</h2>
-            <p>Room expired or a winner has been decided. Please rejoin via lobby.</p>
-            <button id="btn-back-to-lobby" style="margin-top:20px; background:var(--color-blue); width:100%;">Back to Lobby</button>
+            <h2 id="winner-text" style="color: #fbbf24; font-size: 2rem;">Game Over!</h2>
+            <p style="margin: 15px 0;">Room expired or a winner decided. Let's play again!</p>
+            <button id="btn-back-to-lobby" class="btn-blue">Back to Lobby</button>
         </div>
     </div>
-
-    <!-- Mobile Chat Toggle Button -->
-    <button id="chat-toggle-btn">💬 Chat</button>
 
     <!-- Chat UI -->
     <div id="chat-widget">
@@ -123,15 +123,16 @@
 
     <!-- Leaderboard Modal -->
     <div id="leaderboard-modal" class="hidden">
-        <div class="modal-content" style="max-width: 400px; width: 100%;">
+        <div class="modal-content">
             <h2 style="color: #eab308; margin-bottom: 20px;">🏆 Leaderboard</h2>
-            <div id="leaderboard-list" style="max-height: 300px; overflow-y: auto; text-align: left; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 8px;">
+            <div id="leaderboard-list" style="max-height: 300px; overflow-y: auto; text-align: left; padding: 15px; background: rgba(0,0,0,0.5); border-radius: 12px; border: 1px solid #334155;">
                 Loading...
             </div>
-            <button id="btn-close-leaderboard" style="width: 100%; margin-top: 15px; background: var(--board-dark);">Close</button>
+            <button id="btn-close-leaderboard" class="btn-dark" style="margin-top: 15px;">Close</button>
         </div>
     </div>
     <script src="/socket.io/socket.io.js"></script>
+    <script src="audio.js?v=1"></script>
     <script src="engine.js?v=6"></script>
     <script src="ui.js?v=10"></script>
 </body>

@@ -25,7 +25,7 @@ app.use(express.static(__dirname));
 
 let waitingQueue = []; 
 let queueTimeoutInterval = null;
-let secondsLeft = 15;
+let secondsLeft = 5;
 
 let customRooms = {}; // { 'A1B2': { players: [], timeout: null } }
 let leaverBans = {}; // { username: timestamp }
@@ -45,6 +45,13 @@ function generateId() {
     return Math.random().toString(36).substring(2, 9);
 }
 
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+}
+
 const TURN_TIME_MS = 20000;
 
 function processQueue(forceStart = false) {
@@ -61,7 +68,11 @@ function processQueue(forceStart = false) {
         let playersInMatch = waitingQueue.splice(0, 4);
         let roomId = generateId();
         let game = new GameEngine();
-        game.turnIndex = Math.floor(Math.random() * 4);
+        
+        // EXPLICIT STARTING TURN RANDOMIZATION
+        game.turnIndex = Math.floor(Math.random() * 4); 
+        console.log(`[SERVER] Match started. Room: ${roomId}, Initial turnIndex: ${game.turnIndex} (${CHESS_COLORS[game.turnIndex]})`);
+        
         game.teamMode = false;
         let players = {};
         let playerNames = {};
@@ -69,6 +80,7 @@ function processQueue(forceStart = false) {
         let bots = [];
 
         let availableColors = [...CHESS_COLORS];
+        shuffleArray(availableColors);
         
         playersInMatch.forEach((p) => {
             let assignedColor = availableColors.shift();
@@ -91,19 +103,21 @@ function processQueue(forceStart = false) {
             bots.push(botColor);
             playerNames[botColor] = "Master Bot " + botCount;
             playerFlags[botColor] = validBotFlags[Math.floor(Math.random() * validBotFlags.length)];
+            console.log(`[SERVER] Bot assigned to ${botColor}: ${playerNames[botColor]}`);
             botCount++;
         });
 
         rooms[roomId] = { game, players, playerNames, playerFlags, bots, turnTimer: null, turnEndTime: 0 };
+        console.log(`[SERVER] Human player colors: ${JSON.stringify(players)}`);
         
-        secondsLeft = 15;
+        secondsLeft = 5;
         startTurnTimer(roomId);
         startGameLoop(roomId);
         
         if (waitingQueue.length > 0) processQueue();
     } else {
         if (!queueTimeoutInterval && waitingQueue.length > 0) {
-            secondsLeft = 15;
+            secondsLeft = 5;
             queueTimeoutInterval = setInterval(() => {
                 secondsLeft--;
                 broadcastQueueUpdate();
@@ -153,7 +167,7 @@ function forceBotMove(roomId) {
     if (bestMove) {
         let res = room.game.movePiece(bestMove.fx, bestMove.fy, bestMove.tx, bestMove.ty);
         startTurnTimer(roomId);
-        broadcastRoomState(roomId, res.promoted);
+        broadcastRoomState(roomId, res);
         triggerBotMove(roomId);
     }
 }
@@ -170,9 +184,11 @@ function startTurnTimer(roomId) {
     }, TURN_TIME_MS);
 }
 
-function broadcastRoomState(roomId, promoted = false) {
+function broadcastRoomState(roomId, moveResult = {}) {
     let room = rooms[roomId];
     if (!room) return;
+
+    let isCheck = room.game.isCheck(room.game.getCurrentTurnColor());
 
     if (room.game.gameOver && !room.savedScores) {
         room.savedScores = true;
@@ -203,7 +219,9 @@ function broadcastRoomState(roomId, promoted = false) {
         turnEndTime: room.turnEndTime,
         serverTime: Date.now(),
         lastMove: room.game.lastMove,
-        promoted: promoted,
+        promoted: moveResult.promoted || false,
+        capture: moveResult.capture || false,
+        check: isCheck,
         roomId: roomId
     });
 }
@@ -251,6 +269,7 @@ function processCustomRoom(code) {
     let bots = [];
     
     let availableColors = [...CHESS_COLORS];
+    shuffleArray(availableColors);
     pList.forEach((p, index) => {
         let color = availableColors[index];
         players[p.socket.id] = color;
@@ -419,7 +438,7 @@ io.on('connection', (socket) => {
         if (validMoves.some(m => m.x === data.tx && m.y === data.ty)) {
             let result = room.game.movePiece(data.fx, data.fy, data.tx, data.ty);
             startTurnTimer(roomId);
-            broadcastRoomState(roomId, result.promoted);
+            broadcastRoomState(roomId, result);
             triggerBotMove(roomId);
         }
     });
