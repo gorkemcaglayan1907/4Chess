@@ -8,6 +8,7 @@ const io = require('socket.io')(http, {
 
 const { GameEngine, CHESS_COLORS } = require('./engine.js');
 const fs = require('fs');
+const path = require('path');
 
 app.use(express.static(__dirname));
 
@@ -308,6 +309,16 @@ io.on('connection', (socket) => {
         waitingQueue = waitingQueue.filter(p => p.sessionId !== socket.sessionId);
         broadcastQueueUpdate();
     });
+});
+
+// SPA catch-all: serve index.html for any unmatched route
+app.get('*', (req, res) => {
+    const indexPath = path.join(__dirname, 'index.html');
+    if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+    } else {
+        res.status(404).send('4Chess - Server running');
+    }
 });
 
 const PORT = process.env.PORT || 3001;
