@@ -59,7 +59,9 @@ function setupMatch(playersInMatch, roomData = {}) {
     let playerNames = {};
     let playerFlags = {};
     let bots = [];
-    let availableColors = [...CHESS_COLORS];
+    
+    // Shuffle available colors to randomize who gets which color
+    let availableColors = [...CHESS_COLORS].sort(() => Math.random() - 0.5);
 
     playersInMatch.forEach((p, idx) => {
         let assignedColor = availableColors.shift();
