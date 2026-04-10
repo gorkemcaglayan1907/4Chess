@@ -97,16 +97,18 @@
       border-radius: 50%; border: 4px solid rgba(0,0,0,.18);
     }
     .piece {
-      font-size: inherit; line-height: 1;
-      text-shadow: 0 1px 3px rgba(0,0,0,.6);
-      z-index: 1;
-      transition: transform .18s ease;
+      display: flex; align-items: center; justify-content: center;
+      width: 82%; height: 82%; border-radius: 50%;
+      font-size: 55%; font-weight: 900; color: #fff;
+      z-index: 1; user-select: none;
+      transform-origin: center center;
     }
-    .piece.white  { color: #22c55e; }
-    .piece.black  { color: #000; text-shadow: 0 0 6px rgba(255,255,255,.8), 0 1px 3px rgba(0,0,0,.6); }
-    .piece.blue   { color: #2563eb; }
-    .piece.red    { color: #ef4444; }
-    .piece.elim   { color: #64748b; opacity: .5; }
+    .piece.white  { background: #16a34a; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
+    .piece.black  { background: #475569; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
+    .piece.blue   { background: #2563eb; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
+    .piece.red    { background: #dc2626; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
+    .piece.elim   { background: #334155; opacity: .45; }
+    .piece .plabel { font-size: 100%; font-weight: 900; line-height: 1; }
 
     /* HUD */
     .hud { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 4px 8px; gap: 6px; }
@@ -334,6 +336,8 @@ function computeCellSize() {
   cellSize = Math.floor(maxDim / 14);
 }
 
+const PIECE_LABEL = { king:'K', queen:'Q', rook:'R', bishop:'B', knight:'N', pawn:'P' };
+
 function renderBoard() {
   if (!game) return;
   computeCellSize();
@@ -341,13 +345,16 @@ function renderBoard() {
   board.style.width  = (cellSize * 14) + 'px';
   board.style.height = (cellSize * 14) + 'px';
   board.style.gridTemplateColumns = `repeat(14, ${cellSize}px)`;
-  board.style.fontSize = (cellSize * 0.82) + 'px';
+  board.style.fontSize = cellSize + 'px';
   board.style.transform = `rotate(${boardRotation}deg)`;
   board.innerHTML = '';
 
   for (let y = 0; y < 14; y++) {
     for (let x = 0; x < 14; x++) {
       const cell = document.createElement('div');
+      cell.style.width = cellSize + 'px';
+      cell.style.height = cellSize + 'px';
+
       if (!inBounds(x, y)) {
         cell.className = 'cell dead';
       } else {
@@ -361,23 +368,21 @@ function renderBoard() {
         if (isSelected) cls += ' selected';
         else if (isLast) cls += ' last-move';
         if (isHint) cls += cellPiece ? ' hint-capture' : ' hint';
-
         cell.className = cls;
-        cell.style.width = cellSize + 'px';
-        cell.style.height = cellSize + 'px';
 
         if (cellPiece) {
-          const span = document.createElement('span');
           const active = game.activePlayers?.[cellPiece.color] !== false;
-          span.className = 'piece ' + (active ? cellPiece.color : 'elim');
-          span.textContent = UNICODE[cellPiece.type] || '?';
-          span.style.transform = `rotate(${-boardRotation}deg)`;
-          cell.appendChild(span);
+          const badge = document.createElement('div');
+          badge.className = 'piece ' + (active ? cellPiece.color : 'elim');
+          badge.style.transform = `rotate(${-boardRotation}deg)`;
+          const lbl = document.createElement('span');
+          lbl.className = 'plabel';
+          lbl.textContent = PIECE_LABEL[cellPiece.type] || '?';
+          badge.appendChild(lbl);
+          cell.appendChild(badge);
         }
         cell.addEventListener('click', () => handleCellClick(x, y));
       }
-      cell.style.width = cellSize + 'px';
-      cell.style.height = cellSize + 'px';
       board.appendChild(cell);
     }
   }
