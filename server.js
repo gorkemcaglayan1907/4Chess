@@ -174,8 +174,6 @@ function startTurnTimer(roomId) {
     if (room.turnTimer) clearTimeout(room.turnTimer);
     room.turnEndTime = Date.now() + TURN_TIME_MS;
     room.turnTimer = setTimeout(() => forceBotMove(roomId), TURN_TIME_MS);
-    // Explicit Turn Update for transparency
-    io.to(roomId).emit('chat_msg', { name: 'Sistem', text: `SÄ±ra: ${room.game.getCurrentTurnColor().toUpperCase()}`, color: '#64748b' });
 }
 
 function broadcastRoomState(roomId, moveResult = {}) {
@@ -211,7 +209,7 @@ function purgePlayer(sessionId) {
         if (color && !room.game.gameOver) {
             room.bots.push(color);
             delete room.players[sessionId];
-            io.to(roomId).emit('chat_msg', { name: 'Sistem', text: `${room.playerNames[color]} ayrÄ±ldÄ±, Bot devraldÄ±.`, color: 'red' });
+            io.to(roomId).emit('chat_msg', { name: 'System', text: `${room.playerNames[color]} left. Bot takes over.`, color: 'red' });
             if (room.game.getCurrentTurnColor() === color) triggerBotMove(roomId);
             broadcastRoomState(roomId);
         }
@@ -299,7 +297,7 @@ io.on('connection', (socket) => {
         if (roomId) {
             if (!matchBannedPlayers[roomId]) matchBannedPlayers[roomId] = new Set();
             matchBannedPlayers[roomId].add(socket.sessionId);
-            io.to(roomId).emit('chat_msg', { name: 'Sistem', text: `Bir oyuncu pes etti ve maÃ§tan ayrÄ±ldÄ±.`, color: 'red' });
+            io.to(roomId).emit('chat_msg', { name: 'System', text: `A player resigned and left the match.`, color: 'red' });
         }
         purgePlayer(socket.sessionId);
         // Explicitly tell all client tabs for THIS session to go to lobby
