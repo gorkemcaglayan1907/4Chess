@@ -126,9 +126,14 @@ function processQueue(forceStart = false) {
 }
 
 function broadcastQueueUpdate() {
+    if (waitingQueue.length === 0 && queueTimeoutInterval) {
+        clearInterval(queueTimeoutInterval);
+        queueTimeoutInterval = null;
+    }
     let count = waitingQueue.length;
+    let names = waitingQueue.map(p => p.name);
     waitingQueue.forEach(p => {
-        p.socket.emit('queue_update', { count, max: 4, secondsLeft }); 
+        p.socket.emit('queue_update', { count, max: 4, secondsLeft, names }); 
     });
 }
 
@@ -224,6 +229,10 @@ function purgePlayer(sessionId) {
             sockets.forEach(s => { if(s.sessionId === sessionId) s.leave(roomId); });
         });
     }
+    if (waitingQueue.length === 0 && queueTimeoutInterval) {
+        clearInterval(queueTimeoutInterval);
+        queueTimeoutInterval = null;
+    }
     delete userRooms[sessionId];
 }
 
@@ -312,6 +321,10 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         waitingQueue = waitingQueue.filter(p => p.sessionId !== socket.sessionId);
+        if (waitingQueue.length === 0 && queueTimeoutInterval) {
+            clearInterval(queueTimeoutInterval);
+            queueTimeoutInterval = null;
+        }
         broadcastQueueUpdate();
     });
 });
