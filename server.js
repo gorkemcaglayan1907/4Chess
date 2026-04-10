@@ -100,6 +100,9 @@ function setupMatch(playersInMatch, roomData = {}) {
         p.socket.emit('match_found', { color: players[p.sessionId], roomId: roomId });
         p.socket.emit('init_state', initState);
     });
+    
+    // Check if the very first turn belongs to a bot so it starts immediately
+    triggerBotMove(roomId);
 }
 
 function processQueue(forceStart = false) {
