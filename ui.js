@@ -11,8 +11,8 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     let currentRoomId = null;
-    const UNICODE = {
-        king: '♚\uFE0E', queen: '♛\uFE0E', rook: '♜\uFE0E', bishop: '♝\uFE0E', knight: '♞\uFE0E', pawn: '♟\uFE0E'
+    const ICONS = {
+        king: 'fa-chess-king', queen: 'fa-chess-queen', rook: 'fa-chess-rook', bishop: 'fa-chess-bishop', knight: 'fa-chess-knight', pawn: 'fa-chess-pawn'
     };
     const CHESS_COLORS = ['white', 'blue', 'black', 'red'];
     const COLOR_NAMES = { white: 'Green', blue: 'Blue', black: 'Black', red: 'Red' };
@@ -308,8 +308,14 @@ window.addEventListener('DOMContentLoaded', () => {
                         pDiv.style.pointerEvents = 'none'; // CRITICAL: So clicks fall through to BoardDiv
                         boardDiv.appendChild(pDiv);
                     }
-                    pDiv.innerText = UNICODE[p.type];
-                    pDiv.style.setProperty('--rot', `rotate(${-boardRotation}deg)`);
+                    pDiv.innerHTML = `<i class="fa-solid ${ICONS[p.type]}"></i>`;
+                    // Correct piece rotation logic
+                    let pieceRot = 0;
+                    if (boardRotation === 90) pieceRot = 270;
+                    else if (boardRotation === 180) pieceRot = 180;
+                    else if (boardRotation === 270) pieceRot = 90;
+                    
+                    pDiv.style.setProperty('--rot', `rotate(${pieceRot}deg)`);
                     pDiv.style.left = `calc(var(--cell-size) * ${x})`;
                     pDiv.style.top = `calc(var(--cell-size) * ${y})`;
                     pDiv.classList.toggle('playable', myColor && p.color === myColor && CHESS_COLORS[gameData.turnIndex] === myColor && !gameData.gameOver);
@@ -337,33 +343,47 @@ window.addEventListener('DOMContentLoaded', () => {
             if (inBounds(lm.tx, lm.ty)) cellsDOM[lm.ty][lm.tx].classList.add('last-move');
         }
 
-        // Panel updates...
-        let turnColor = CHESS_COLORS[gameData.turnIndex];
-        let turnName = playerNamesMap[turnColor] || COLOR_NAMES[turnColor];
-        const turnNameDOM = document.getElementById('turn-player-name');
-        if (turnNameDOM) {
-            turnNameDOM.innerText = turnName;
-            const webColors = { white: '#22c55e', blue: '#60a5fa', black: '#94a3b8', red: '#f87171' };
-            turnNameDOM.style.color = webColors[turnColor] || 'white';
+        // New HUD Render (Vertical List in Top-Left)
+        const playerList = document.getElementById('player-list-container');
+        if (playerList) {
+            playerList.innerHTML = '';
+            CHESS_COLORS.forEach(c => {
+                let isTurn = gameData && turnColor === c && !gameData.gameOver;
+                const pColors = { white: '#22c55e', blue: '#3b82f6', black: '#94a3b8', red: '#ef4444' };
+                const currentColor = pColors[c] || '#fbbf24';
+                
+                const item = document.createElement('div');
+                item.className = 'player-item';
+                if (isTurn) item.classList.add('active-turn');
+                if (playerActiveMap[c] === false) item.classList.add('eliminated');
+                item.style.color = currentColor;
+
+                item.innerHTML = `
+                    <div class="player-dot" style="background-color: ${currentColor}"></div>
+                    <div class="player-info-meta">
+                        <span class="player-name-text">${playerNamesMap[c] || '...'}</span>
+                        <span class="player-score-text">${playerScoresMap[c] || 0}P</span>
+                    </div>
+                `;
+                playerList.appendChild(item);
+            });
         }
-        CHESS_COLORS.forEach(c => {
-            let pos = panelMap[c];
-            let pnl = document.getElementById(`panel-screen-${pos}`);
-            if(!pnl) return;
-            pnl.dataset.color = c;
-            pnl.classList.toggle('active-panel', turnColor === c && !gameData.gameOver);
-            pnl.style.opacity = playerActiveMap[c] === false ? '0.4' : '1';
-            pnl.querySelector('.player-name').innerText = playerNamesMap[c] || COLOR_NAMES[c];
-            pnl.querySelector('.player-score').innerText = `Score: ${playerScoresMap[c] || 0}`;
-            pnl.querySelector('.player-status').innerText = playerActiveMap[c] === false ? 'ELIMINATED' : (turnColor === c ? 'Thinking...' : 'Waiting');
-        });
+
+        // Your Turn Alert
+        const alertBox = document.getElementById('your-turn-alert');
+        if (alertBox) {
+            const isMyTurn = myColor && turnColor === myColor && !gameData.gameOver;
+            if (isMyTurn) {
+                const myColors = { white: '#22c55e', blue: '#3b82f6', black: '#000', red: '#ef4444' };
+                alertBox.style.backgroundColor = myColors[myColor] || '#10b981';
+                alertBox.style.display = 'block';
+            } else {
+                alertBox.style.display = 'none';
+            }
+        }
 
         if (gameData.gameOver) {
-            let w = gameData.winner;
-            let wt = document.getElementById('winner-text');
-            if(wt) wt.innerText = w ? `Winner: ${playerNamesMap[w]}!` : "Draw!";
-            let gom = document.getElementById('game-over-modal');
-            if(gom) gom.classList.remove('hidden');
+            // Re-show simplified overlay if needed or handled in style
             if(btnResign) btnResign.classList.add('hidden');
             const ct = document.getElementById('chat-toggle-btn');
             if(ct) ct.classList.add('hidden');

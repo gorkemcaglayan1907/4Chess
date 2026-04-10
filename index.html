@@ -2,19 +2,39 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>4CHESS</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=6">
+    <link rel="stylesheet" href="style.css?v=101">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 <body>
-    <!-- Landscape Orientation Warning -->
-    <div id="landscape-warning">
-        <div style="font-size: 3rem; margin-bottom:10px;">🔄</div>
-        Please Rotate Your Device
-        <p style="font-size: 1rem; color: #94a3b8; font-weight: normal; margin-top: 10px;">For the best experience, please hold your device horizontally.</p>
+    <!-- Turkish Vertical-only Warning -->
+    <div id="mobile-vertical-lock">
+        <div style="font-size: 3rem; margin-bottom:10px;">📱</div>
+        Lütfen Cihazı Dik Tutunuz
+        <p style="font-size: 1rem; color: #94a3b8; font-weight: normal; margin-top: 10px;">Bu oyun sadece dikey modda oynanacak şekilde tasarlanmıştır.</p>
     </div>
-    
+
+    <script>
+        function enforcePortrait() {
+            const lock = document.getElementById('mobile-vertical-lock');
+            if (!lock) return;
+            const isLandscape = window.innerWidth > window.innerHeight;
+            // Lock for mobile-sized screens (up to 1200px landscape)
+            if (isLandscape && window.innerWidth < 1200) {
+                lock.setAttribute('style', 'display:flex !important;');
+                document.body.style.overflow = 'hidden';
+            } else {
+                lock.setAttribute('style', 'display:none !important;');
+                document.body.style.overflow = 'auto';
+            }
+        }
+        window.addEventListener('resize', enforcePortrait);
+        window.addEventListener('orientationchange', enforcePortrait);
+        window.addEventListener('load', enforcePortrait);
+        setInterval(enforcePortrait, 1000); // Fail-safe check
+    </script>
 
     <div id="login-screen">
         <div class="modal-content">
@@ -54,60 +74,26 @@
 
     <!-- Match interface -->
     <div id="game-container" class="hidden">
-        <div id="turn-indicator-wrapper">
-            <div>
-                <h2 id="turn-indicator">Turn: <span id="turn-player-name">...</span></h2>
-                <p id="game-status-text">Waiting for game...</p>
-            </div>
-        </div>
         
         <!-- LARGE TIMER ON THE LEFT -->
         <div id="turn-timer-visual"></div>
 
         <button id="btn-resign" class="btn-red hidden">🏳️ Resign</button>
 
+        <div id="player-list-container">
+            <!-- Populated via JS to match App.js vertical list -->
+        </div>
+
+        <div id="your-turn-alert">⚡️ YOUR TURN! ⚡️</div>
+
         <div id="board-wrapper">
-            <!-- Screen HUDs -->
-            <div class="screen-panel panel-top" id="panel-screen-top">
-                <span class="player-name">...</span>
-                <span class="player-status">...</span>
-                <span class="player-score">...</span>
-            </div>
-            
-            <div class="screen-panel panel-left" id="panel-screen-left">
-                <span class="player-name">...</span>
-                <span class="player-status">...</span>
-                <span class="player-score">...</span>
-            </div>
-
             <div id="chess-board"></div>
-
-            <div class="screen-panel panel-right" id="panel-screen-right">
-                <span class="player-name">...</span>
-                <span class="player-status">...</span>
-                <span class="player-score">...</span>
-            </div>
-
-            <div class="screen-panel panel-bottom" id="panel-screen-bottom">
-                <span class="player-name">...</span>
-                <span class="player-status">...</span>
-                <span class="player-score">...</span>
-            </div>
         </div>
 
-        <!-- Mobile Chat Toggle Button -->
-        <button id="chat-toggle-btn" class="hidden">💬 Chat</button>
-    </div>
+    <button id="chat-toggle-btn" class="hidden">
+        <i class="fas fa-comments"></i>
+    </button>
 
-    <div id="game-over-modal" class="hidden">
-        <div class="modal-content">
-            <h2 id="winner-text" style="color: #fbbf24; font-size: 2rem;">Game Over!</h2>
-            <p style="margin: 15px 0;">Room expired or a winner decided. Let's play again!</p>
-            <button id="btn-back-to-lobby" class="btn-blue">Back to Lobby</button>
-        </div>
-    </div>
-
-    <!-- Chat UI -->
     <div id="chat-widget">
         <div id="chat-header">
             Game Chat
@@ -116,7 +102,7 @@
         <div id="chat-messages"></div>
         <div id="chat-input-area">
             <input type="text" id="chat-input" placeholder="Type a message..." maxlength="60">
-            <button id="btn-send-chat">Send</button>
+            <button id="btn-send-chat"><i class="fas fa-paper-plane"></i></button>
         </div>
     </div>
 
@@ -132,8 +118,8 @@
         </div>
     </div>
     <script src="/socket.io/socket.io.js"></script>
-    <script src="audio.js?v=1"></script>
-    <script src="engine.js?v=6"></script>
-    <script src="ui.js?v=10"></script>
+    <script src="audio.js?v=101"></script>
+    <script src="engine.js?v=101"></script>
+    <script src="ui.js?v=101"></script>
 </body>
 </html>

@@ -20,6 +20,10 @@ class GameEngine {
 
     }
 
+    getCurrentTurnColor() {
+        return CHESS_COLORS[this.turnIndex];
+    }
+
     createEmptyBoard() {
         let b = [];
         for (let y = 0; y < 14; y++) {
@@ -103,10 +107,7 @@ class GameEngine {
         do {
             this.turnIndex = (this.turnIndex + 1) % 4;
             attempts++;
-            if (attempts > 4) {
-                // Should not happen unless game is bugged or ended
-                break;
-            }
+            if (attempts > 5) break; 
         } while (!this.activePlayers[this.getCurrentTurnColor()]);
         
         // Check if the current player is checkmated
@@ -545,6 +546,11 @@ class GameEngine {
                 bestScore = score;
                 bestMove = move;
             }
+        }
+        
+        // Safety Fallback: If evaluation failed to pick a move but moves exist, pick one at random.
+        if (!bestMove && validMovesList.length > 0) {
+            bestMove = validMovesList[Math.floor(Math.random() * validMovesList.length)];
         }
         
         return bestMove;
