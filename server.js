@@ -91,7 +91,8 @@ function setupMatch(playersInMatch, roomData = {}) {
         game, players, playerNames, playerFlags, bots, 
         turnTimer: null, turnEndTime: 0, 
         lastMoveTime: Date.now(),
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        timeoutCounts: { white: 0, black: 0, blue: 0, red: 0 }
     };
 
     startTurnTimer(roomId);
@@ -109,16 +110,25 @@ function processQueue(forceStart = false) {
     if (waitingQueue.length === 0) return;
     if (waitingQueue.length >= 4 || forceStart) {
         if (queueTimeoutInterval) { clearInterval(queueTimeoutInterval); queueTimeoutInterval = null; }
+        secondsLeft = 5; // Reset global timer
         let playersInMatch = waitingQueue.splice(0, 4);
-        setupMatch(playersInMatch);
+        try {
+            setupMatch(playersInMatch);
+        } catch (e) {
+            console.error("[MATCH ERROR] Failed to start match:", e);
+        }
         if (waitingQueue.length > 0) processQueue();
     } else {
         if (!queueTimeoutInterval && waitingQueue.length > 0) {
             secondsLeft = 5;
             queueTimeoutInterval = setInterval(() => {
                 secondsLeft--;
+                if (secondsLeft < 0) secondsLeft = 0; // Prevent negative
                 broadcastQueueUpdate();
-                if (secondsLeft <= 0) processQueue(true);
+                if (secondsLeft <= 0) {
+                    if (queueTimeoutInterval) { clearInterval(queueTimeoutInterval); queueTimeoutInterval = null; }
+                    processQueue(true);
+                }
             }, 1000);
         }
         broadcastQueueUpdate();
@@ -149,6 +159,29 @@ function forceBotMove(roomId) {
     let room = rooms[roomId];
     if (!room || room.game.gameOver) return false;
     let currentColor = room.game.getCurrentTurnColor();
+
+    // Check if this is a player timeout (current color belongs to a human)
+    let humanSessionId = Object.keys(room.players).find(sid => room.players[sid] === currentColor);
+    if (humanSessionId) {
+        room.timeoutCounts[currentColor]++;
+        if (room.timeoutCounts[currentColor] >= 2) {
+            console.log(`[KICK] Kicking ${room.playerNames[currentColor]} (${currentColor}) in ${roomId} for inactivity.`);
+            room.bots.push(currentColor);
+            delete room.players[humanSessionId];
+            io.to(roomId).emit('chat_msg', { name: 'System', text: `${room.playerNames[currentColor]} kicked for inactivity. Bot takes over.`, color: 'red' });
+            
+            // Force all sockets for this session to leave the room
+            io.in(roomId).fetchSockets().then(sockets => {
+                sockets.forEach(s => { 
+                    if(s.sessionId === humanSessionId) {
+                        s.emit('force_lobby');
+                        s.leave(roomId);
+                    }
+                });
+            });
+        }
+    }
+
     try {
         let bestMove = room.game.getBestMove(currentColor);
         if (bestMove) {
@@ -282,21 +315,22 @@ io.on('connection', (socket) => {
             let names = customRooms[code].players.map(p => p.name);
             customRooms[code].players.forEach(p => p.socket.emit('custom_room_joined', { code, count: customRooms[code].players.length, names }));
             if (customRooms[code].players.length === 4) processCustomRoom(code);
-        } else { socket.emit('room_error', 'Oda dolu veya bulunamadÄ±.'); }
+        } else { socket.emit('room_error', 'Oda dolu veya bulunamadı.'); }
     });
 
     socket.on('make_move', (data) => {
         let roomId = userRooms[socket.sessionId];
         let room = rooms[roomId];
-        if (!room) return socket.emit('move_error', 'Oda bulunamadÄ±.');
+        if (!room) return socket.emit('move_error', 'Oda bulunamadı.');
         let playerColor = room.players[socket.sessionId];
-        if (playerColor !== room.game.getCurrentTurnColor()) return socket.emit('move_error', 'SÄ±ra sizde deÄŸil.');
+        if (playerColor !== room.game.getCurrentTurnColor()) return socket.emit('move_error', 'Sıra sizde değil.');
         if (room.game.movePiece(data.fx, data.fy, data.tx, data.ty).success) {
+            room.timeoutCounts[playerColor] = 0; // Reset timeouts on successful move
             room.lastMoveTime = Date.now();
             startTurnTimer(roomId);
             broadcastRoomState(roomId);
             triggerBotMove(roomId);
-        } else { socket.emit('move_error', 'GeÃ§ersiz hamle.'); }
+        } else { socket.emit('move_error', 'Geçersiz hamle.'); }
     });
 
     socket.on('chat_msg', (data) => {
