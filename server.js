@@ -185,8 +185,12 @@ function forceBotMove(roomId) {
         }
     }
 
+    const startTime = Date.now();
     try {
         let bestMove = room.game.getBestMove(currentColor);
+        const calcTime = Date.now() - startTime;
+        if (calcTime > 1000) console.log(`[PERF] Slow move calculation: ${calcTime}ms in ${roomId} for ${currentColor}`);
+
         if (bestMove) {
             let result = room.game.movePiece(bestMove.fx, bestMove.fy, bestMove.tx, bestMove.ty);
             room.lastMoveTime = Date.now();
@@ -194,9 +198,26 @@ function forceBotMove(roomId) {
             broadcastRoomState(roomId, result);
             triggerBotMove(roomId);
             return true;
+        } else {
+            // Fail-Safe: No best move found (engine hang or bug), pass turn
+            console.log(`[FAILSAFE] No valid moves found for ${currentColor} in ${roomId}, passing turn.`);
+            room.game.nextTurn();
+            startTurnTimer(roomId);
+            broadcastRoomState(roomId);
+            triggerBotMove(roomId);
+            return false;
         }
-    } catch (e) { console.error(`[BOT ERR] ${roomId}:`, e); }
-    return false;
+    } catch (e) { 
+        console.error(`[CRITICAL ERR] ${roomId} during bot move:`, e);
+        // Emergency recovery: Pass turn
+        try {
+            room.game.nextTurn();
+            startTurnTimer(roomId);
+            broadcastRoomState(roomId);
+            triggerBotMove(roomId);
+        } catch (innerE) { console.error(`[DOUBLE FAIL] ${roomId}:`, innerE); }
+        return false;
+    }
 }
 
 // Garbage Collection for Stale/Finished Rooms

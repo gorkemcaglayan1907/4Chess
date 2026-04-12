@@ -318,24 +318,31 @@ class GameEngine {
         return null;
     }
 
+    getAllPieces(b = this.board) {
+        let pieces = [];
+        for (let y = 0; y < 14; y++) {
+            for (let x = 0; x < 14; x++) {
+                if (this.inBounds(x, y) && b[y][x].piece) {
+                    pieces.push({ x, y, piece: b[y][x].piece });
+                }
+            }
+        }
+        return pieces;
+    }
+
     isCheck(color, b = this.board) {
         const kpos = this.findKing(color, b);
         if (!kpos) return false; 
 
-        for (let c of CHESS_COLORS) {
-            if (!this.isAlly(c, color) && this.activePlayers[c]) {
-                for (let y = 0; y < 14; y++) {
-                    for (let x = 0; x < 14; x++) {
-                        if (this.inBounds(x, y)) {
-                            let p = b[y][x].piece;
-                            if (p && p.color === c) {
-                                let ops = this.getRawMoves(x, y, b);
-                                if (ops.some(m => m.x === kpos.x && m.y === kpos.y)) {
-                                    return true;
-                                }
-                            }
-                        }
-                    }
+        // Optimization: Get only relevant pieces once
+        const allPieces = this.getAllPieces(b);
+
+        for (let pObj of allPieces) {
+            const p = pObj.piece;
+            if (!this.isAlly(p.color, color) && this.activePlayers[p.color]) {
+                let ops = this.getRawMoves(pObj.x, pObj.y, b);
+                if (ops.some(m => m.x === kpos.x && m.y === kpos.y)) {
+                    return true;
                 }
             }
         }
@@ -417,15 +424,26 @@ class GameEngine {
 
         // Auto-eliminate kingless
         for (let c of CHESS_COLORS) {
-            if (this.activePlayers[c] && this.hasOnlyKing(c)) {
+            if (this.activePlayers[c] && !this.findKing(c, this.board)) {
                 this.activePlayers[c] = false;
                 this.checkWinCondition();
             }
         }
 
+        // Detect if move resulted in a check to ANY opponent
+        let hasCheck = false;
+        for (let c of CHESS_COLORS) {
+            if (!this.isAlly(c, piece.color) && this.activePlayers[c]) {
+                if (this.isCheck(c, this.board)) {
+                    hasCheck = true;
+                    break;
+                }
+            }
+        }
+
         this.lastMove = { fx, fy, tx, ty };
         this.nextTurn();
-        return { success: true, promoted, capture: !!targetPiece };
+        return { success: true, promoted, capture: !!targetPiece, check: hasCheck };
     }
 
     evaluateBoard(b, color) {
