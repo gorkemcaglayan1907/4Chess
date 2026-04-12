@@ -52,7 +52,7 @@ function deleteRoom(roomId) {
 function setupMatch(playersInMatch, roomData = {}) {
     const roomId = generateId();
     const game = new GameEngine();
-    game.turnIndex = 0; 
+    game.turnIndex = Math.floor(Math.random() * 4); 
     game.teamMode = roomData.teamMode || false;
 
     let players = {}; 
