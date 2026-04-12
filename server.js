@@ -332,7 +332,7 @@ io.on('connection', (socket) => {
             let names = customRooms[code].players.map(p => p.name);
             customRooms[code].players.forEach(p => p.socket.emit('custom_room_joined', { code, count: customRooms[code].players.length, names, isHost: !!p.isHost }));
             if (customRooms[code].players.length === 4) processCustomRoom(code);
-        } else { socket.emit('room_error', 'Oda bulunamadı veya dolmuş olabilir. Lütfen kodu kontrol edin.'); }
+        } else { socket.emit('room_error', 'Room not found or might be full. Please check the code.'); }
     });
     
     socket.on('leave_lobby', () => {
@@ -352,16 +352,16 @@ io.on('connection', (socket) => {
     socket.on('make_move', (data) => {
         let roomId = userRooms[socket.sessionId];
         let room = rooms[roomId];
-        if (!room) return socket.emit('move_error', 'Oda bulunamadı.');
+        if (!room) return socket.emit('move_error', 'Room not found.');
         let playerColor = room.players[socket.sessionId];
-        if (playerColor !== room.game.getCurrentTurnColor()) return socket.emit('move_error', 'Sıra sizde değil.');
+        if (playerColor !== room.game.getCurrentTurnColor()) return socket.emit('move_error', 'It is not your turn.');
         if (room.game.movePiece(data.fx, data.fy, data.tx, data.ty).success) {
             room.timeoutCounts[playerColor] = 0; // Reset timeouts on successful move
             room.lastMoveTime = Date.now();
             startTurnTimer(roomId);
             broadcastRoomState(roomId);
             triggerBotMove(roomId);
-        } else { socket.emit('move_error', 'Geçersiz hamle.'); }
+        } else { socket.emit('move_error', 'Invalid move.'); }
     });
 
     socket.on('chat_msg', (data) => {
