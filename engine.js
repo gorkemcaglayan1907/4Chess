@@ -66,27 +66,26 @@ class GameEngine {
         // White (y = 13, y = 12)
         for (let i = 0; i < 8; i++) {
             let x = i + 3;
-            // Add m: false to track movement for castling
-            this.board[13][x].piece = { type: backRank[i], color: 'white', id: generateId('white', backRank[i]), m: false };
-            this.board[12][x].piece = { type: PIECES.PAWN, color: 'white', id: generateId('white', PIECES.PAWN), m: false };
+            this.board[13][x].piece = { type: backRank[i], color: 'white', id: generateId('white', backRank[i]) };
+            this.board[12][x].piece = { type: PIECES.PAWN, color: 'white', id: generateId('white', PIECES.PAWN) };
         }
         // Black (y = 0, y = 1)
         for (let i = 0; i < 8; i++) {
             let x = i + 3;
-            this.board[0][x].piece = { type: backRank[i], color: 'black', id: generateId('black', backRank[i]), m: false };
-            this.board[1][x].piece = { type: PIECES.PAWN, color: 'black', id: generateId('black', PIECES.PAWN), m: false };
+            this.board[0][x].piece = { type: backRank[i], color: 'black', id: generateId('black', backRank[i]) };
+            this.board[1][x].piece = { type: PIECES.PAWN, color: 'black', id: generateId('black', PIECES.PAWN) };
         }
         // Blue (x = 0, x = 1)
         for (let i = 0; i < 8; i++) {
             let y = i + 3;
-            this.board[y][0].piece = { type: backRank[i], color: 'blue', id: generateId('blue', backRank[i]), m: false };
-            this.board[y][1].piece = { type: PIECES.PAWN, color: 'blue', id: generateId('blue', PIECES.PAWN), m: false };
+            this.board[y][0].piece = { type: backRank[i], color: 'blue', id: generateId('blue', backRank[i]) };
+            this.board[y][1].piece = { type: PIECES.PAWN, color: 'blue', id: generateId('blue', PIECES.PAWN) };
         }
         // Red (x = 13, x = 12)
         for (let i = 0; i < 8; i++) {
             let y = i + 3;
-            this.board[y][13].piece = { type: backRank[i], color: 'red', id: generateId('red', backRank[i]), m: false };
-            this.board[y][12].piece = { type: PIECES.PAWN, color: 'red', id: generateId('red', PIECES.PAWN), m: false };
+            this.board[y][13].piece = { type: backRank[i], color: 'red', id: generateId('red', backRank[i]) };
+            this.board[y][12].piece = { type: PIECES.PAWN, color: 'red', id: generateId('red', PIECES.PAWN) };
         }
     }
 
@@ -265,47 +264,6 @@ class GameEngine {
             case PIECES.KING:
                 const kMoves = [[1,0],[0,1],[-1,0],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
                 kMoves.forEach(m => addMoveIfValid(x + m[0], y + m[1]));
-                
-                // --- Castling Implementation ---
-                if (!pState.m && !this.isCheck(color, b)) {
-                    // Find standard rook positions for this player
-                    let rookPositions = [];
-                    if (color === 'white') rookPositions = [{rx: 3, ry: 13, tx: 6, ty: 13}, {rx: 10, ry: 13, tx: 8, ty: 13}];
-                    if (color === 'black') rookPositions = [{rx: 3, ry: 0, tx: 6, ty: 0}, {rx: 10, ry: 0, tx: 8, ty: 0}];
-                    if (color === 'blue') rookPositions = [{rx: 0, ry: 3, tx: 0, ty: 6}, {rx: 0, ry: 10, tx: 0, ty: 8}];
-                    if (color === 'red') rookPositions = [{rx: 13, ry: 3, tx: 13, ty: 6}, {rx: 13, ry: 10, tx: 13, ty: 8}];
-                    
-                    for (let pos of rookPositions) {
-                        let r = b[pos.ry]?.[pos.rx]?.piece;
-                        if (r && r.type === PIECES.ROOK && r.color === color && !r.m) {
-                            // Check if path is clear
-                            let pathClear = true;
-                            let dx = Math.sign(pos.rx - x);
-                            let dy = Math.sign(pos.ry - y);
-                            let steps = Math.max(Math.abs(pos.rx - x), Math.abs(pos.ry - y));
-                            
-                            for (let s = 1; s < steps; s++) {
-                                let px = x + dx * s;
-                                let py = y + dy * s;
-                                if (b[py][px].piece) { pathClear = false; break; }
-                                // King cannot pass through check
-                                if (s <= 2) {
-                                    let tempB = this.cloneBoard(b);
-                                    tempB[py][px].piece = tempB[y][x].piece;
-                                    tempB[y][x].piece = null;
-                                    if (this.isCheck(color, tempB)) { pathClear = false; break; }
-                                }
-                            }
-                            
-                            if (pathClear) {
-                                // Short Castle (2 steps) or Long Castle (2 steps in 4-player)
-                                let targetX = x + dx * 2;
-                                let targetY = y + dy * 2;
-                                moves.push({ x: targetX, y: targetY, castling: true, rookPos: {fx: pos.rx, fy: pos.ry, tx: pos.tx, ty: pos.ty} });
-                            }
-                        }
-                    }
-                }
                 break;
             case PIECES.ROOK:
                 slide(1, 0); slide(-1, 0); slide(0, 1); slide(0, -1);
@@ -435,23 +393,8 @@ class GameEngine {
             }
         }
 
-        // Execute the move
         this.board[ty][tx].piece = piece;
         this.board[fy][fx].piece = null;
-        piece.m = true; // Mark as moved
-
-        // Handle Castling (Secondary Rook Move)
-        const possibleValidMoves = this.getRawMoves(fx, fy); 
-        const castlingMove = possibleValidMoves.find(m => m.x === tx && m.y === ty && m.castling);
-        if (castlingMove && piece.type === PIECES.KING) {
-            const rp = castlingMove.rookPos;
-            const rook = this.board[rp.fy][rp.fx].piece;
-            if (rook) {
-                this.board[rp.ty][rp.tx].piece = rook;
-                this.board[rp.fy][rp.fx].piece = null;
-                rook.m = true;
-            }
-        }
 
         if (targetPiece && targetPiece.type === PIECES.KING) {
             this.activePlayers[targetPiece.color] = false;
