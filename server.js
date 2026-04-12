@@ -136,6 +136,9 @@ function processQueue(forceStart = false) {
 }
 
 function broadcastQueueUpdate() {
+    // CRITICAL: Filter out any sockets that might have disconnected but weren't purged yet
+    waitingQueue = waitingQueue.filter(p => p.socket && p.socket.connected);
+    
     if (waitingQueue.length === 0 && queueTimeoutInterval) {
         clearInterval(queueTimeoutInterval);
         queueTimeoutInterval = null;
@@ -276,6 +279,11 @@ function purgePlayer(sessionId) {
         queueTimeoutInterval = null;
     }
     delete userRooms[sessionId];
+    
+    // BROADCAST UPDATE IMMEDIATELY AFTER PURGE
+    if (waitingQueue.length > 0) {
+        broadcastQueueUpdate();
+    }
 }
 
 io.on('connection', (socket) => {
@@ -324,7 +332,7 @@ io.on('connection', (socket) => {
             let names = customRooms[code].players.map(p => p.name);
             customRooms[code].players.forEach(p => p.socket.emit('custom_room_joined', { code, count: customRooms[code].players.length, names, isHost: !!p.isHost }));
             if (customRooms[code].players.length === 4) processCustomRoom(code);
-        } else { socket.emit('room_error', 'Oda dolu veya bulunamadı.'); }
+        } else { socket.emit('room_error', 'Oda bulunamadı veya dolmuş olabilir. Lütfen kodu kontrol edin.'); }
     });
     
     socket.on('leave_lobby', () => {
