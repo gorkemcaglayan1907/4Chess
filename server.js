@@ -228,7 +228,8 @@ function broadcastRoomState(roomId, moveResult = {}) {
     io.to(roomId).emit('state_update', {
         board: room.game.board, turnIndex: room.game.turnIndex,
         activePlayers: room.game.activePlayers, gameOver: room.game.gameOver, winner: room.game.winner,
-        turnEndTime: room.turnEndTime, serverTime: Date.now(), lastMove: room.game.lastMove, roomId: roomId
+        turnEndTime: room.turnEndTime, serverTime: Date.now(), lastMove: room.game.lastMove, roomId: roomId,
+        capture: moveResult.capture, check: moveResult.check, promoted: moveResult.promoted
     });
 }
 
