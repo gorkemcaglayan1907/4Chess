@@ -246,6 +246,15 @@ function processCustomRoom(code) {
 
 function purgePlayer(sessionId) {
     waitingQueue = waitingQueue.filter(p => p.sessionId !== sessionId);
+    Object.keys(customRooms).forEach(code => {
+        customRooms[code].players = customRooms[code].players.filter(p => p.sessionId !== sessionId);
+        if (customRooms[code].players.length === 0) delete customRooms[code];
+        else {
+            // Notify remaining players about the departure
+            let names = customRooms[code].players.map(p => p.name);
+            customRooms[code].players.forEach(p => p.socket.emit('custom_room_joined', { code, count: customRooms[code].players.length, names, isHost: !!p.isHost }));
+        }
+    });
     let roomId = userRooms[sessionId];
     if (roomId && rooms[roomId]) {
         let room = rooms[roomId];
@@ -318,6 +327,11 @@ io.on('connection', (socket) => {
         } else { socket.emit('room_error', 'Oda dolu veya bulunamadı.'); }
     });
     
+    socket.on('leave_lobby', () => {
+        console.log(`[LEAVE LOBBY] ${socket.sessionId}`);
+        purgePlayer(socket.sessionId);
+    });
+
     socket.on('start_game_now', () => {
         // Find the room where this socket is the host
         let code = Object.keys(customRooms).find(c => customRooms[c].players.some(p => p.sessionId === socket.sessionId && p.isHost));
