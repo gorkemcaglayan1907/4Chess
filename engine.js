@@ -422,11 +422,13 @@ class GameEngine {
             }
         }
 
-        // Auto-eliminate kingless
+        // Auto-eliminate kingless or players with ONLY a King
         for (let c of CHESS_COLORS) {
-            if (this.activePlayers[c] && !this.findKing(c, this.board)) {
-                this.activePlayers[c] = false;
-                this.checkWinCondition();
+            if (this.activePlayers[c]) {
+                if (!this.findKing(c, this.board) || this.hasOnlyKing(c)) {
+                    this.activePlayers[c] = false;
+                    this.checkWinCondition();
+                }
             }
         }
 
