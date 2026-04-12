@@ -304,7 +304,7 @@ io.on('connection', (socket) => {
         purgePlayer(socket.sessionId);
         let code = generateRoomCode();
         customRooms[code] = { teamMode: data.teamMode || false, players: [{ socket, name: data.name, flag: data.flag, sessionId: socket.sessionId, isHost: true }] };
-        socket.emit('custom_room_joined', { code, count: 1, names: [data.name] });
+        socket.emit('custom_room_joined', { code, count: 1, names: [data.name], isHost: true });
     });
 
     socket.on('join_room', (data) => {
@@ -313,9 +313,18 @@ io.on('connection', (socket) => {
             purgePlayer(socket.sessionId);
             customRooms[code].players.push({ socket, name: data.name, flag: data.flag, sessionId: socket.sessionId });
             let names = customRooms[code].players.map(p => p.name);
-            customRooms[code].players.forEach(p => p.socket.emit('custom_room_joined', { code, count: customRooms[code].players.length, names }));
+            customRooms[code].players.forEach(p => p.socket.emit('custom_room_joined', { code, count: customRooms[code].players.length, names, isHost: !!p.isHost }));
             if (customRooms[code].players.length === 4) processCustomRoom(code);
         } else { socket.emit('room_error', 'Oda dolu veya bulunamadı.'); }
+    });
+    
+    socket.on('start_game_now', () => {
+        // Find the room where this socket is the host
+        let code = Object.keys(customRooms).find(c => customRooms[c].players.some(p => p.sessionId === socket.sessionId && p.isHost));
+        if (code) {
+            console.log(`[MANUAL START] Host started room ${code}`);
+            processCustomRoom(code);
+        }
     });
 
     socket.on('make_move', (data) => {
