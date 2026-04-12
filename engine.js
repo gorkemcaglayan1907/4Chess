@@ -9,7 +9,7 @@ const PIECE_VALUES = {
 class GameEngine {
     constructor() {
         this.board = this.createEmptyBoard();
-        this.turnIndex = 0; // 0=white, 1=blue, 2=black, 3=red
+        this.turnIndex = Math.floor(Math.random() * 4); // Start randomly (0=white, 1=blue, 2=black, 3=red)
         this.activePlayers = { white: true, blue: true, black: true, red: true };
         this.scores = { white: 0, blue: 0, black: 0, red: 0 };
         this.setupPieces();
@@ -304,40 +304,34 @@ class GameEngine {
         return valid;
     }
 
-    findKing(color, b) {
+    getPieceSummary(b = this.board) {
+        let summary = {
+            kings: {},
+            activePieces: []
+        };
         for (let y = 0; y < 14; y++) {
             for (let x = 0; x < 14; x++) {
                 if (this.inBounds(x, y)) {
                     let p = b[y][x].piece;
-                    if (p && p.type === PIECES.KING && p.color === color) {
-                        return {x, y};
+                    if (p) {
+                        let pObj = { x, y, piece: p };
+                        summary.activePieces.push(pObj);
+                        if (p.type === PIECES.KING) {
+                            summary.kings[p.color] = { x, y };
+                        }
                     }
                 }
             }
         }
-        return null;
+        return summary;
     }
 
-    getAllPieces(b = this.board) {
-        let pieces = [];
-        for (let y = 0; y < 14; y++) {
-            for (let x = 0; x < 14; x++) {
-                if (this.inBounds(x, y) && b[y][x].piece) {
-                    pieces.push({ x, y, piece: b[y][x].piece });
-                }
-            }
-        }
-        return pieces;
-    }
-
-    isCheck(color, b = this.board) {
-        const kpos = this.findKing(color, b);
+    isCheck(color, b = this.board, optionalSummary = null) {
+        const summary = optionalSummary || this.getPieceSummary(b);
+        const kpos = summary.kings[color];
         if (!kpos) return false; 
 
-        // Optimization: Get only relevant pieces once
-        const allPieces = this.getAllPieces(b);
-
-        for (let pObj of allPieces) {
+        for (let pObj of summary.activePieces) {
             const p = pObj.piece;
             if (!this.isAlly(p.color, color) && this.activePlayers[p.color]) {
                 let ops = this.getRawMoves(pObj.x, pObj.y, b);
@@ -423,9 +417,11 @@ class GameEngine {
         }
 
         // Auto-eliminate kingless or players with ONLY a King
+        const summary = this.getPieceSummary(this.board);
         for (let c of CHESS_COLORS) {
             if (this.activePlayers[c]) {
-                if (!this.findKing(c, this.board) || this.hasOnlyKing(c)) {
+                // Check if King exists in our scanned summary
+                if (!summary.kings[c] || this.hasOnlyKing(c, summary)) {
                     this.activePlayers[c] = false;
                     this.checkWinCondition();
                 }
@@ -506,17 +502,13 @@ class GameEngine {
         let bestMove = null;
         let bestScore = -Infinity;
         
+        const summary = this.getPieceSummary(this.board);
         let validMovesList = [];
-        for (let y = 0; y < 14; y++) {
-            for (let x = 0; x < 14; x++) {
-                if (this.inBounds(x, y)) {
-                    let p = this.board[y][x].piece;
-                    if (p && p.color === color) {
-                        let moves = this.getValidMoves(x, y);
-                        for (let mv of moves) {
-                            validMovesList.push({ fx: x, fy: y, tx: mv.x, ty: mv.y });
-                        }
-                    }
+        for (let pObj of summary.activePieces) {
+            if (pObj.piece.color === color) {
+                let moves = this.getValidMoves(pObj.x, pObj.y);
+                for (let mv of moves) {
+                    validMovesList.push({ fx: pObj.x, fy: pObj.y, tx: mv.x, ty: mv.y });
                 }
             }
         }
@@ -524,7 +516,7 @@ class GameEngine {
         if (validMovesList.length === 0) return null;
 
         // Current board threats
-        const currentThreats = this.getThreatMap(color, this.board);
+        const currentThreats = this.getThreatMap(color, this.board, summary);
 
         for (let move of validMovesList) {
             let nextB = this.cloneBoard(this.board);
@@ -534,32 +526,26 @@ class GameEngine {
             nextB[move.ty][move.tx].piece = movingPiece;
             nextB[move.fy][move.fx].piece = null;
             
+            // Optimization: Get summary of the HYPOTHETICAL board
+            const nextSummary = this.getPieceSummary(nextB);
             let score = this.evaluateBoard(nextB, color);
 
-            // Capture bonus (Greedy)
-            if (targetPiece) {
-                // Only give bonus if target player is still in the game
-                if (this.activePlayers[targetPiece.color]) {
-                    score += (PIECE_VALUES[targetPiece.type] * 12) + 5;
-                } else {
-                    // Very small bonus to clear dead pieces if literally nothing else to do
-                    score += 0.1;
-                }
+            // Capture bonus
+            if (targetPiece && this.activePlayers[targetPiece.color]) {
+                score += (PIECE_VALUES[targetPiece.type] * 12) + 5;
             }
             
             // Threat detection at destination
-            let destThreatMap = this.getThreatMap(color, nextB);
+            let destThreatMap = this.getThreatMap(color, nextB, nextSummary);
             if (destThreatMap[move.ty][move.tx]) {
-                // Moving into danger penalty
                 score -= (PIECE_VALUES[movingPiece.type] * 15);
             }
 
-            // Rescue bonus: If piece was under threat and now it's not (and destination is safe)
+            // Rescue bonus
             if (currentThreats[move.fy][move.fx] && !destThreatMap[move.ty][move.tx]) {
                 score += (PIECE_VALUES[movingPiece.type] * 8);
             }
             
-            // Small randomness to avoid identical games
             score += Math.random() * 0.5;
 
             if (score > bestScore) {
@@ -568,7 +554,6 @@ class GameEngine {
             }
         }
         
-        // Safety Fallback: If evaluation failed to pick a move but moves exist, pick one at random.
         if (!bestMove && validMovesList.length > 0) {
             bestMove = validMovesList[Math.floor(Math.random() * validMovesList.length)];
         }
@@ -576,22 +561,16 @@ class GameEngine {
         return bestMove;
     }
 
-    getThreatMap(color, b) {
+    getThreatMap(color, b, optionalSummary = null) {
         let threats = Array.from({length: 14}, () => Array(14).fill(false));
-        for (let c of CHESS_COLORS) {
-            if (!this.isAlly(c, color) && this.activePlayers[c]) {
-                for (let y = 0; y < 14; y++) {
-                    for (let x = 0; x < 14; x++) {
-                        if (this.inBounds(x, y)) {
-                            let p = b[y][x].piece;
-                            if (p && p.color === c) {
-                                let ops = this.getRawMoves(x, y, b);
-                                for (let m of ops) {
-                                    threats[m.y][m.x] = true;
-                                }
-                            }
-                        }
-                    }
+        const summary = optionalSummary || this.getPieceSummary(b);
+        
+        for (let pObj of summary.activePieces) {
+            const p = pObj.piece;
+            if (!this.isAlly(p.color, color) && this.activePlayers[p.color]) {
+                let ops = this.getRawMoves(pObj.x, pObj.y, b);
+                for (let m of ops) {
+                    threats[m.y][m.x] = true;
                 }
             }
         }
@@ -600,6 +579,8 @@ class GameEngine {
 }
 
 
+// Export for both Node.js and ES6 (Expo)
 if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {
     module.exports = { GameEngine, CHESS_COLORS, PIECES, PIECE_VALUES };
 }
+export { GameEngine, CHESS_COLORS, PIECES, PIECE_VALUES };

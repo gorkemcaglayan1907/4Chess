@@ -96,7 +96,8 @@ function setupMatch(playersInMatch, roomData = {}) {
         turnTimer: null, turnEndTime: 0, 
         lastMoveTime: Date.now(),
         createdAt: Date.now(),
-        timeoutCounts: { white: 0, black: 0, blue: 0, red: 0 }
+        timeoutCounts: { white: 0, black: 0, blue: 0, red: 0 },
+        isCalculating: false
     };
 
     startTurnTimer(roomId);
@@ -164,7 +165,8 @@ function triggerBotMove(roomId) {
 
 function forceBotMove(roomId) {
     let room = rooms[roomId];
-    if (!room || room.game.gameOver) return false;
+    if (!room || room.game.gameOver || room.isCalculating) return false;
+    room.isCalculating = true;
     let currentColor = room.game.getCurrentTurnColor();
 
     // Check if this is a player timeout (current color belongs to a human)
@@ -221,6 +223,8 @@ function forceBotMove(roomId) {
             triggerBotMove(roomId);
         } catch (innerE) { console.error(`[DOUBLE FAIL] ${roomId}:`, innerE); }
         return false;
+    } finally {
+        if (room) room.isCalculating = false;
     }
 }
 
