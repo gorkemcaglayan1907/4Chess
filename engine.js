@@ -110,25 +110,8 @@ class GameEngine {
             if (attempts > 5) break; 
         } while (!this.activePlayers[this.getCurrentTurnColor()]);
         
-        // Check if the current player is checkmated
-        if (this.isCheckmate(this.getCurrentTurnColor(), this.board)) {
-            let eliminatedColor = this.getCurrentTurnColor();
-            this.activePlayers[eliminatedColor] = false;
-            
-            // Find who gets the 20 points for the King. We check who is actually attacking the king.
-            let attacker = this.getAttackerOfKing(eliminatedColor);
-            if (attacker) {
-                this.scores[attacker] += 20; // 20 points for eliminating a king
-            }
-            
-            // Re-evaluate win condition
-            this.checkWinCondition();
-            
-            // Recurse to pass turn to next active
-            if (!this.gameOver) {
-                this.nextTurn();
-            }
-        }
+        // Re-evaluate win condition
+        this.checkWinCondition();
     }
 
     removePiecesOfColor(color) {
@@ -264,6 +247,32 @@ class GameEngine {
             case PIECES.KING:
                 const kMoves = [[1,0],[0,1],[-1,0],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
                 kMoves.forEach(m => addMoveIfValid(x + m[0], y + m[1]));
+                
+                // CASTLING (ROK) LOGIC
+                if (!pState.moved) {
+                    const checkCastle = (rookX, rookY, emptyCoords, targetX, targetY) => {
+                        const rookPiece = b[rookY][rookX].piece;
+                        if (rookPiece && rookPiece.type === PIECES.ROOK && !rookPiece.moved) {
+                            if (emptyCoords.every(c => !b[c.y][c.x].piece)) {
+                                moves.push({ x: targetX, y: targetY, castling: true, rookX, rookY });
+                            }
+                        }
+                    };
+
+                    if (color === 'white') {
+                        checkCastle(10, 13, [{x:8, y:13}, {x:9, y:13}], 9, 13); // O-O
+                        checkCastle(3, 13, [{x:4, y:13}, {x:5, y:13}, {x:6, y:13}], 5, 13); // O-O-O
+                    } else if (color === 'black') {
+                        checkCastle(10, 0, [{x:8, y:0}, {x:9, y:0}], 9, 0); // O-O
+                        checkCastle(3, 0, [{x:4, y:0}, {x:5, y:0}, {x:6, y:0}], 5, 0); // O-O-O
+                    } else if (color === 'blue') {
+                        checkCastle(0, 10, [{x:0, y:8}, {x:0, y:9}], 0, 9); // O-O
+                        checkCastle(0, 3, [{x:0, y:4}, {x:0, y:5}, {x:0, y:6}], 0, 5); // O-O-O
+                    } else if (color === 'red') {
+                        checkCastle(13, 10, [{x:13, y:8}, {x:13, y:9}], 13, 9); // O-O
+                        checkCastle(13, 3, [{x:13, y:4}, {x:13, y:5}, {x:13, y:6}], 13, 5); // O-O-O
+                    }
+                }
                 break;
             case PIECES.ROOK:
                 slide(1, 0); slide(-1, 0); slide(0, 1); slide(0, -1);
@@ -292,6 +301,19 @@ class GameEngine {
         
         let valid = [];
         for (let mv of rawMoves) {
+            // CASTLING SPECIAL SAFETY: Cannot castle through check or into check
+            if (mv.castling) {
+                if (this.isCheck(color, this.board)) continue; // Cannot castle OUT OF check
+                
+                // Check intermediate square
+                const interX = (x + mv.x) / 2;
+                const interY = (y + mv.y) / 2;
+                const interB = this.cloneBoard(this.board);
+                interB[interY][interX].piece = interB[y][x].piece;
+                interB[y][x].piece = null;
+                if (this.isCheck(color, interB)) continue; // Cannot castle THROUGH check
+            }
+
             const nextB = this.cloneBoard(this.board);
             // Simulate move
             nextB[mv.y][mv.x].piece = nextB[y][x].piece;
@@ -393,6 +415,39 @@ class GameEngine {
             }
         }
 
+        // Execute Castling: Move the Rook as well
+        const isKing = piece.type === PIECES.KING;
+        const distMoved = Math.max(Math.abs(fx - tx), Math.abs(fy - ty));
+        const isCastling = !!(isKing && distMoved > 1);
+
+        if (isCastling) {
+            let rx, ry, rtx, rty;
+            // Identify Rook based on King's destination and color
+            if (piece.color === 'white') {
+                ry = 13; rty = 13;
+                if (tx === 9) { rx = 10; rtx = 8; } else if (tx === 5) { rx = 3; rtx = 6; }
+            } else if (piece.color === 'black') {
+                ry = 0; rty = 0;
+                if (tx === 9) { rx = 10; rtx = 8; } else if (tx === 5) { rx = 3; rtx = 6; }
+            } else if (piece.color === 'blue') {
+                rx = 0; rtx = 0;
+                if (ty === 9) { ry = 10; rty = 8; } else if (ty === 5) { ry = 3; rty = 6; }
+            } else if (piece.color === 'red') {
+                rx = 13; rtx = 13;
+                if (ty === 9) { ry = 10; rty = 8; } else if (ty === 5) { ry = 3; rty = 6; }
+            }
+
+            if (rx !== undefined && this.board[ry][rx].piece) {
+                // Relocate the Rook
+                this.board[rty][rtx].piece = this.board[ry][rx].piece;
+                if (this.board[rty][rtx].piece) {
+                    this.board[rty][rtx].piece.moved = true;
+                }
+                this.board[ry][rx].piece = null;
+            }
+        }
+
+        piece.moved = true; // Mark as moved for Rok
         this.board[ty][tx].piece = piece;
         this.board[fy][fx].piece = null;
 
@@ -405,10 +460,11 @@ class GameEngine {
         let promoted = false;
         if (piece.type === PIECES.PAWN) {
             let reachedEnd = false;
-            if (piece.color === 'white' && ty === 0) reachedEnd = true;
-            if (piece.color === 'black' && ty === 13) reachedEnd = true;
-            if (piece.color === 'blue' && tx === 13) reachedEnd = true;
-            if (piece.color === 'red' && tx === 0) reachedEnd = true;
+            // 4-Player Promotion Rule: Enter opponent's 3x8 base arm
+            if (piece.color === 'white' && ty <= 2 && tx >= 3 && tx <= 10) reachedEnd = true;
+            if (piece.color === 'black' && ty >= 11 && tx >= 3 && tx <= 10) reachedEnd = true;
+            if (piece.color === 'blue' && tx >= 11 && ty >= 3 && ty <= 10) reachedEnd = true;
+            if (piece.color === 'red' && tx <= 2 && ty >= 3 && ty <= 10) reachedEnd = true;
 
             if (reachedEnd) {
                 piece.type = PIECES.QUEEN;
@@ -416,19 +472,29 @@ class GameEngine {
             }
         }
 
-        // Auto-eliminate kingless or players with ONLY a King
+        // INSTANT ELIMINATION: Check if this move checkmated any opponent
+        for (let c of CHESS_COLORS) {
+            if (c !== piece.color && this.activePlayers[c]) {
+                if (this.isCheckmate(c, this.board)) {
+                    this.activePlayers[c] = false;
+                    this.scores[piece.color] += 20; // 20 points for eliminating an opponent via mate
+                    this.checkWinCondition();
+                }
+            }
+        }
+
+        // Auto-eliminate kingless players (extra safety)
         const summary = this.getPieceSummary(this.board);
         for (let c of CHESS_COLORS) {
             if (this.activePlayers[c]) {
-                // Check if King exists in our scanned summary
-                if (!summary.kings[c] || this.hasOnlyKing(c, summary)) {
+                if (!summary.kings[c]) {
                     this.activePlayers[c] = false;
                     this.checkWinCondition();
                 }
             }
         }
 
-        // Detect if move resulted in a check to ANY opponent
+        // Detect if move resulted in a check to ANY active opponent
         let hasCheck = false;
         for (let c of CHESS_COLORS) {
             if (!this.isAlly(c, piece.color) && this.activePlayers[c]) {
@@ -485,12 +551,22 @@ class GameEngine {
             }
         }
 
-        // Critical: Checking others is good
+        // SMARTER AI: Checking others is good, but restricted Kings are better!
+        const summary = this.getPieceSummary(b);
         for (let c of CHESS_COLORS) {
             if (!this.isAlly(c, color) && this.activePlayers[c]) {
-                if (this.isCheck(c, b)) {
-                    score += 15; // Bonus for checking an opponent
-                    if (this.isCheckmate(c, b)) score += 100; // Major bonus for mate
+                const kpos = summary.kings[c];
+                if (kpos) {
+                    if (this.isCheck(c, b, summary)) {
+                        score += 10; // Base check bonus (reduced from 15 to prevent infinite loops)
+                        if (this.isCheckmate(c, b)) score += 500; // Extreme weight for mate
+                    }
+                    
+                    // KING RESTRICTION BONUS: Highly reward reducing the King's escape squares
+                    try {
+                        let availableSquares = this.getValidMoves(kpos.x, kpos.y).length;
+                        score += (8 - availableSquares) * 5; // Up to +40 for trapping the King
+                    } catch(e) {}
                 }
             }
         }
