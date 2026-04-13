@@ -256,7 +256,8 @@ function broadcastRoomState(roomId, moveResult = {}) {
     let room = rooms[roomId]; if (!room) return;
     io.to(roomId).emit('state_update', {
         board: room.game.board, turnIndex: room.game.turnIndex,
-        activePlayers: room.game.activePlayers, gameOver: room.game.gameOver, winner: room.game.winner,
+        activePlayers: room.game.activePlayers, scores: room.game.scores, 
+        gameOver: room.game.gameOver, winner: room.game.winner,
         turnEndTime: room.turnEndTime, serverTime: Date.now(), lastMove: room.game.lastMove, roomId: roomId,
         capture: moveResult.capture, check: moveResult.check, promoted: moveResult.promoted
     });
@@ -266,7 +267,8 @@ function getInitState(roomId) {
     let room = rooms[roomId]; if (!room) return null;
     return {
         board: room.game.board, turnIndex: room.game.turnIndex,
-        activePlayers: room.game.activePlayers, gameOver: room.game.gameOver, winner: room.game.winner,
+        activePlayers: room.game.activePlayers, scores: room.game.scores,
+        gameOver: room.game.gameOver, winner: room.game.winner,
         playerNames: room.playerNames, playerFlags: room.playerFlags, turnEndTime: room.turnEndTime,
         serverTime: Date.now(), lastMove: room.game.lastMove, roomId: roomId
     };
