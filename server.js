@@ -404,13 +404,20 @@ io.on('connection', (socket) => {
 
     socket.on('resign', () => {
         let roomId = userRooms[socket.sessionId];
-        if (roomId) {
-            if (!matchBannedPlayers[roomId]) matchBannedPlayers[roomId] = new Set();
-            matchBannedPlayers[roomId].add(socket.sessionId);
-            io.to(roomId).emit('chat_msg', { name: 'System', text: `A player resigned and left the match.`, color: 'red' });
+        if (roomId && rooms[roomId]) {
+            let room = rooms[roomId];
+            let color = room.players[socket.sessionId];
+            if (color && !room.game.gameOver) {
+                // Apply resignation penalty
+                room.game.scores[color] -= 50;
+                
+                if (!matchBannedPlayers[roomId]) matchBannedPlayers[roomId] = new Set();
+                matchBannedPlayers[roomId].add(socket.sessionId);
+                io.to(roomId).emit('chat_msg', { name: 'System', text: `${room.playerNames[color]} resigned and lost 50 points.`, color: 'red' });
+                broadcastRoomState(roomId);
+            }
         }
         purgePlayer(socket.sessionId);
-        // Explicitly tell all client tabs for THIS session to go to lobby
         socket.emit('force_lobby'); 
     });
 

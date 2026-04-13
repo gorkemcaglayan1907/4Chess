@@ -3,7 +3,7 @@ const PIECES = {
     PAWN: 'pawn', ROOK: 'rook', KNIGHT: 'knight', BISHOP: 'bishop', QUEEN: 'queen', KING: 'king'
 };
 const PIECE_VALUES = {
-    pawn: 1, knight: 3, bishop: 3.5, rook: 5, queen: 9, king: 100
+    pawn: 1, knight: 3, bishop: 5, rook: 5, queen: 10, king: 100
 };
 
 class GameEngine {
@@ -17,7 +17,7 @@ class GameEngine {
         this.winner = null;
         this.lastMove = null;
         this.teamMode = false;
-
+        this.eliminationOrder = []; // Track who is eliminated 4th, 3rd, 2nd, etc.
     }
 
     getCurrentTurnColor() {
@@ -149,10 +149,30 @@ class GameEngine {
             if (activeCount === 1) {
                 this.gameOver = true;
                 this.winner = lastActive;
+                // Add the winner as the last remaining (1st place)
+                if (!this.eliminationOrder.includes(lastActive)) {
+                    this.eliminationOrder.push(lastActive);
+                }
+                this.applyRankingBonuses();
             } else if (activeCount === 0) {
                 this.gameOver = true; // Draw / everyone lost
+                this.applyRankingBonuses();
             }
         }
+    }
+
+    applyRankingBonuses() {
+        // Elimination Order contains players from 4th to 1st place
+        // Index 0 = 4th place (-20)
+        // Index 1 = 3rd place (0)
+        // Index 2 = 2nd place (+20)
+        // Index 3 = 1st place (+50)
+        const bonuses = [-20, 0, 20, 50];
+        this.eliminationOrder.forEach((color, index) => {
+            if (bonuses[index] !== undefined) {
+                this.scores[color] += bonuses[index];
+            }
+        });
     }
 
     hasOnlyKing(color) {
@@ -477,7 +497,8 @@ class GameEngine {
             if (c !== piece.color && this.activePlayers[c]) {
                 if (this.isCheckmate(c, this.board)) {
                     this.activePlayers[c] = false;
-                    this.scores[piece.color] += 20; // 20 points for eliminating an opponent via mate
+                    this.scores[piece.color] += 20; // Bonus for the player who delivered the mate
+                    if (!this.eliminationOrder.includes(c)) this.eliminationOrder.push(c);
                     this.checkWinCondition();
                 }
             }
@@ -489,6 +510,7 @@ class GameEngine {
             if (this.activePlayers[c]) {
                 if (!summary.kings[c] || this.hasOnlyKing(c)) {
                     this.activePlayers[c] = false;
+                    if (!this.eliminationOrder.includes(c)) this.eliminationOrder.push(c);
                     this.checkWinCondition();
                 }
             }
