@@ -483,11 +483,11 @@ class GameEngine {
             }
         }
 
-        // Auto-eliminate kingless players (extra safety)
+        // Auto-eliminate kingless players OR players with ONLY a King
         const summary = this.getPieceSummary(this.board);
         for (let c of CHESS_COLORS) {
             if (this.activePlayers[c]) {
-                if (!summary.kings[c]) {
+                if (!summary.kings[c] || this.hasOnlyKing(c)) {
                     this.activePlayers[c] = false;
                     this.checkWinCondition();
                 }
