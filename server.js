@@ -19,6 +19,30 @@ let secondsLeft = 5;
 let customRooms = {};
 const VALID_BOT_FLAGS = ['us', 'gb', 'de', 'jp', 'kr', 'it', 'fr', 'es'];
 
+// Persistent Leaderboard Logic
+let leaderboard = []; 
+try {
+    if (fs.existsSync('leaderboard.json')) {
+        leaderboard = JSON.parse(fs.readFileSync('leaderboard.json', 'utf8'));
+    }
+} catch (e) { console.error("[LEADERBOARD] Load error:", e); }
+
+function updateLeaderboard(name, points) {
+    if (!name || name === '...' || name.includes('Bot')) return;
+    let entry = leaderboard.find(l => l.name === name);
+    if (entry) {
+        entry.score += points;
+        entry.gamesPlayed = (entry.gamesPlayed || 0) + 1;
+    } else {
+        leaderboard.push({ name, score: points, gamesPlayed: 1 });
+    }
+    leaderboard.sort((a, b) => b.score - a.score);
+    // Keep top 100 in file to avoid bloat
+    if (leaderboard.length > 100) leaderboard = leaderboard.slice(0, 100);
+    fs.writeFileSync('leaderboard.json', JSON.stringify(leaderboard));
+}
+
+
 function generateRoomCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let result = '';
@@ -176,8 +200,9 @@ function forceBotMove(roomId) {
         if (room.timeoutCounts[currentColor] >= 2) {
             console.log(`[KICK] Kicking ${room.playerNames[currentColor]} (${currentColor}) in ${roomId} for inactivity.`);
             room.bots.push(currentColor);
+            updateLeaderboard(room.playerNames[currentColor], -50); // Penalty for inactivity
             delete room.players[humanSessionId];
-            io.to(roomId).emit('chat_msg', { name: 'System', text: `${room.playerNames[currentColor]} kicked for inactivity. Bot takes over.`, color: 'red' });
+            io.to(roomId).emit('chat_msg', { name: 'System', text: `${room.playerNames[currentColor]} kicked (-50 pts). Bot takes over.`, color: 'red' });
             
             // Force all sockets for this session to leave the room
             io.in(roomId).fetchSockets().then(sockets => {
@@ -233,13 +258,14 @@ setInterval(() => {
     const now = Date.now();
     Object.keys(rooms).forEach(rid => {
         const room = rooms[rid];
-        // If game is over, delete after 30 seconds
-        if (room.game.gameOver && now - (room.lastMoveTime || now) > 30000) {
-            deleteRoom(rid);
-        }
-        // If match is 2 hours old, delete 
-        else if (now - room.createdAt > 7200000) {
-            deleteRoom(rid);
+        const humanCount = Object.keys(room.players || {}).length;
+        
+        // Delete room only if NO human players are left (only 4 bots)
+        if (humanCount === 0 || room.bots.length === 4) {
+            // Even then, we give 30 seconds for any final broadcast or review
+            if (now - (room.lastMoveTime || room.createdAt) > 30000) {
+                deleteRoom(rid);
+            }
         }
     });
 }, 60000);
@@ -254,6 +280,19 @@ function startTurnTimer(roomId) {
 
 function broadcastRoomState(roomId, moveResult = {}) {
     let room = rooms[roomId]; if (!room) return;
+
+    // Update leaderboard when game ends
+    if (room.game.gameOver && !room.savedScores) {
+        room.savedScores = true;
+        Object.keys(room.players).forEach(sid => {
+            const color = room.players[sid];
+            const name = room.playerNames[color];
+            let pts = room.game.scores[color] || 0;
+            if (room.game.winner === color) pts += 50; // Bonus for winner
+            updateLeaderboard(name, pts);
+        });
+    }
+
     io.to(roomId).emit('state_update', {
         board: room.game.board, turnIndex: room.game.turnIndex,
         activePlayers: room.game.activePlayers, scores: room.game.scores, 
@@ -296,8 +335,9 @@ function purgePlayer(sessionId) {
         let color = room.players[sessionId];
         if (color && !room.game.gameOver) {
             room.bots.push(color);
+            updateLeaderboard(room.playerNames[color], -50); // Penalty for leaving
             delete room.players[sessionId];
-            io.to(roomId).emit('chat_msg', { name: 'System', text: `${room.playerNames[color]} left. Bot takes over.`, color: 'red' });
+            io.to(roomId).emit('chat_msg', { name: 'System', text: `${room.playerNames[color]} left (-50 pts). Bot takes over.`, color: 'red' });
             if (room.game.getCurrentTurnColor() === color) triggerBotMove(roomId);
             broadcastRoomState(roomId);
         }
@@ -381,6 +421,16 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('get_leaderboard', () => {
+        const myName = userSessions[socket.sessionId]?.name || "Guest";
+        const entry = leaderboard.find(l => l.name === myName);
+        socket.emit('leaderboard_res', {
+            top10: leaderboard.slice(0, 10),
+            userStats: entry || { name: myName, score: 0, gamesPlayed: 0 }
+        });
+    });
+
+
     socket.on('make_move', (data) => {
         let roomId = userRooms[socket.sessionId];
         let room = rooms[roomId];
@@ -410,12 +460,11 @@ io.on('connection', (socket) => {
             let room = rooms[roomId];
             let color = room.players[socket.sessionId];
             if (color && !room.game.gameOver) {
-                // Apply resignation penalty
-                room.game.scores[color] -= 50;
-                
                 if (!matchBannedPlayers[roomId]) matchBannedPlayers[roomId] = new Set();
                 matchBannedPlayers[roomId].add(socket.sessionId);
-                io.to(roomId).emit('chat_msg', { name: 'System', text: `${room.playerNames[color]} resigned and lost 50 points.`, color: 'red' });
+                
+                updateLeaderboard(room.playerNames[color], -50); // Penalty for resigning
+                io.to(roomId).emit('chat_msg', { name: 'System', text: `${room.playerNames[color]} resigned (-50 pts).`, color: 'red' });
                 broadcastRoomState(roomId);
             }
         }
