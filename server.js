@@ -117,6 +117,7 @@ function setupMatch(playersInMatch, roomData = {}) {
 
     rooms[roomId] = { 
         game, players, playerNames, playerFlags, bots, 
+        isQuickPlay: !!roomData.isQuickPlay,
         turnTimer: null, turnEndTime: 0, 
         lastMoveTime: Date.now(),
         createdAt: Date.now(),
@@ -142,7 +143,7 @@ function processQueue(forceStart = false) {
         secondsLeft = 5; // Reset global timer
         let playersInMatch = waitingQueue.splice(0, 4);
         try {
-            setupMatch(playersInMatch);
+            setupMatch(playersInMatch, { isQuickPlay: true });
         } catch (e) {
             console.error("[MATCH ERROR] Failed to start match:", e);
         }
@@ -200,7 +201,7 @@ function forceBotMove(roomId) {
         if (room.timeoutCounts[currentColor] >= 2) {
             console.log(`[KICK] Kicking ${room.playerNames[currentColor]} (${currentColor}) in ${roomId} for inactivity.`);
             room.bots.push(currentColor);
-            updateLeaderboard(room.playerNames[currentColor], -50); // Penalty for inactivity
+            if (room.isQuickPlay) updateLeaderboard(room.playerNames[currentColor], -50); // Penalty for inactivity
             delete room.players[humanSessionId];
             io.to(roomId).emit('chat_msg', { name: 'System', text: `${room.playerNames[currentColor]} kicked (-50 pts). Bot takes over.`, color: 'red' });
             
@@ -289,7 +290,7 @@ function broadcastRoomState(roomId, moveResult = {}) {
             const name = room.playerNames[color];
             let pts = room.game.scores[color] || 0;
             if (room.game.winner === color) pts += 50; // Bonus for winner
-            updateLeaderboard(name, pts);
+            if (room.isQuickPlay) updateLeaderboard(name, pts);
         });
     }
 
@@ -335,7 +336,7 @@ function purgePlayer(sessionId) {
         let color = room.players[sessionId];
         if (color && !room.game.gameOver) {
             room.bots.push(color);
-            updateLeaderboard(room.playerNames[color], -50); // Penalty for leaving
+            if (room.isQuickPlay) updateLeaderboard(room.playerNames[color], -50); // Penalty for leaving
             delete room.players[sessionId];
             io.to(roomId).emit('chat_msg', { name: 'System', text: `${room.playerNames[color]} left (-50 pts). Bot takes over.`, color: 'red' });
             if (room.game.getCurrentTurnColor() === color) triggerBotMove(roomId);
@@ -472,7 +473,7 @@ io.on('connection', (socket) => {
                 if (!matchBannedPlayers[roomId]) matchBannedPlayers[roomId] = new Set();
                 matchBannedPlayers[roomId].add(socket.sessionId);
                 
-                updateLeaderboard(room.playerNames[color], -50); // Penalty for resigning
+                if (room.isQuickPlay) updateLeaderboard(room.playerNames[color], -50); // Penalty for resigning
                 io.to(roomId).emit('chat_msg', { name: 'System', text: `${room.playerNames[color]} resigned (-50 pts).`, color: 'red' });
                 broadcastRoomState(roomId);
             }
