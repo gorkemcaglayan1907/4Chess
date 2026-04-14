@@ -306,6 +306,7 @@ function broadcastRoomState(roomId, moveResult = {}) {
         activePlayers: room.game.activePlayers, scores: room.game.scores, 
         gameOver: room.game.gameOver, winner: room.game.winner,
         turnEndTime: room.turnEndTime, serverTime: Date.now(), lastMove: room.game.lastMove, roomId: roomId,
+        isQuickPlay: !!room.isQuickPlay,
         capture: moveResult.capture, check: moveResult.check, promoted: moveResult.promoted
     });
 }
@@ -317,7 +318,8 @@ function getInitState(roomId) {
         activePlayers: room.game.activePlayers, scores: room.game.scores,
         gameOver: room.game.gameOver, winner: room.game.winner,
         playerNames: room.playerNames, playerFlags: room.playerFlags, turnEndTime: room.turnEndTime,
-        serverTime: Date.now(), lastMove: room.game.lastMove, roomId: roomId
+        serverTime: Date.now(), lastMove: room.game.lastMove, roomId: roomId,
+        isQuickPlay: !!room.isQuickPlay
     };
 }
 
