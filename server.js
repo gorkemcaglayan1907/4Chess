@@ -431,9 +431,9 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('get_leaderboard', () => {
-        const myName = userSessions[socket.sessionId]?.name || "Guest";
-        const entry = leaderboard.find(l => l.name === myName);
+    socket.on('get_leaderboard', (data) => {
+        const myName = (data?.name || userSessions[socket.sessionId]?.name || "Guest").trim();
+        const entry = leaderboard.find(l => l.name.trim().toLowerCase() === myName.toLowerCase());
         socket.emit('leaderboard_res', {
             top10: leaderboard.slice(0, 10),
             userStats: entry || { name: myName, score: 0, gamesPlayed: 0 }
