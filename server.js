@@ -385,22 +385,31 @@ io.on('connection', (socket) => {
 
     socket.on('join_queue', (data) => {
         purgePlayer(socket.sessionId);
-        waitingQueue.push({ socket, name: data.username || data.name || 'Guest', flag: data.flag || 'us', sessionId: socket.sessionId });
+        const name = data.username || data.name || 'Guest';
+        const flag = data.flag || 'us';
+        userSessions[socket.sessionId] = { socketId: socket.id, name, flag };
+        waitingQueue.push({ socket, name, flag, sessionId: socket.sessionId });
         processQueue();
     });
 
     socket.on('create_room', (data) => {
         purgePlayer(socket.sessionId);
         let code = generateRoomCode();
-        customRooms[code] = { teamMode: data.teamMode || false, players: [{ socket, name: data.name, flag: data.flag, sessionId: socket.sessionId, isHost: true }] };
-        socket.emit('custom_room_joined', { code, count: 1, names: [data.name], isHost: true });
+        const name = data.name || 'Guest';
+        const flag = data.flag || 'us';
+        userSessions[socket.sessionId] = { socketId: socket.id, name, flag };
+        customRooms[code] = { teamMode: data.teamMode || false, players: [{ socket, name, flag, sessionId: socket.sessionId, isHost: true }] };
+        socket.emit('custom_room_joined', { code, count: 1, names: [name], isHost: true });
     });
 
     socket.on('join_room', (data) => {
         let code = data.code ? data.code.toUpperCase() : null;
         if (customRooms[code] && customRooms[code].players.length < 4) {
             purgePlayer(socket.sessionId);
-            customRooms[code].players.push({ socket, name: data.name, flag: data.flag, sessionId: socket.sessionId });
+            const name = data.name || 'Guest';
+            const flag = data.flag || 'us';
+            userSessions[socket.sessionId] = { socketId: socket.id, name, flag };
+            customRooms[code].players.push({ socket, name, flag, sessionId: socket.sessionId });
             let names = customRooms[code].players.map(p => p.name);
             customRooms[code].players.forEach(p => p.socket.emit('custom_room_joined', { code, count: customRooms[code].players.length, names, isHost: !!p.isHost }));
             if (customRooms[code].players.length === 4) processCustomRoom(code);
