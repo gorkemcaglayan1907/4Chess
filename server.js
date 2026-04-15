@@ -265,15 +265,35 @@ setInterval(() => {
         const room = rooms[rid];
         const humanCount = Object.keys(room.players || {}).length;
         
-        // Delete room only if NO human players are left (only 4 bots)
-        if (humanCount === 0 || room.bots.length === 4) {
-            // Even then, we give 30 seconds for any final broadcast or review
-            if (now - (room.lastMoveTime || room.createdAt) > 30000) {
-                deleteRoom(rid);
-            }
+        // Safety: check if any actual sockets are still joined to this room
+        const roomSockets = io.sockets.adapter.rooms.get(rid);
+        const connectedCount = roomSockets ? roomSockets.size : 0;
+        
+        // Rules for deletion:
+        // 1. If game is NOT over and has connected human sockets, NEVER delete.
+        // 2. If game IS over, wait 5 minutes before deleting unless it's completely empty.
+        // 3. If room is completely empty (no connected sockets), delete after 60 seconds of inactivity.
+        
+        let deleteThreshold = 300000; // 5 minutes default for most cases
+        
+        if (room.game.gameOver) {
+            // Game is over. If people are still connected, give them time (5 mins).
+            // If NO ONE is connected, delete after 60s.
+            deleteThreshold = (connectedCount === 0) ? 60000 : 300000;
+        } else {
+            // Game is NOT over.
+            if (connectedCount > 0) return; // Active game with people watching/playing. Don't touch.
+            
+            // If no one is connected but there are "players" (humanCount > 0), they might have DC'd.
+            // Give them 2 minutes to return before deleting the room due to "ghost" inactivity.
+            deleteThreshold = (humanCount === 0) ? 60000 : 120000;
+        }
+
+        if (now - (room.lastMoveTime || room.createdAt) > deleteThreshold) {
+            deleteRoom(rid);
         }
     });
-}, 60000);
+}, 30000); // Check every 30 seconds
 
 function startTurnTimer(roomId) {
     let room = rooms[roomId];
@@ -385,11 +405,11 @@ io.on('connection', (socket) => {
             delete userRooms[sessionId];
         } else {
             let assignedColor = rooms[roomId].players[sessionId];
-            if (!rooms[roomId].game.gameOver && assignedColor) {
+            if (assignedColor) {
                 socket.join(roomId);
                 socket.emit('match_found', { color: assignedColor, roomId });
                 socket.emit('init_state', getInitState(roomId));
-                console.log(`[RE-BIND] ${sessionId} -> ${roomId} (${assignedColor})`);
+                console.log(`[RE-BIND] ${sessionId} -> ${roomId} (${assignedColor}) ${rooms[roomId].game.gameOver ? '(Game Over)' : ''}`);
             } else {
                 delete userRooms[sessionId];
             }
