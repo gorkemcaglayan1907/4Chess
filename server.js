@@ -34,12 +34,14 @@ try {
 function updateLeaderboard(name, points, avatar, sessionId) {
     if (!name || name === '...' || name.includes('Bot')) return;
     
+    const lookupName = name.trim().toUpperCase();
+    
     // Fallback logic: If avatar is null, try to retrieve from global cache
     let finalAvatar = avatar || (sessionId ? userAvatars[sessionId] : null);
     
-    console.log(`[LEADERBOARD] Update for ${name}: pts=${points}, avatarReceived=${!!avatar}, cachedUsed=${(!avatar && !!finalAvatar)}`);
+    console.log(`[LEADERBOARD] Update for ${lookupName}: pts=${points}, avatarReceived=${!!avatar}, cachedUsed=${(!avatar && !!finalAvatar)}`);
     
-    let entry = leaderboard.find(l => l.name === name);
+    let entry = leaderboard.find(l => l.name.toUpperCase() === lookupName);
     if (entry) {
         entry.score += points;
         entry.gamesPlayed = (entry.gamesPlayed || 0) + 1;
@@ -47,7 +49,7 @@ function updateLeaderboard(name, points, avatar, sessionId) {
             entry.avatar = finalAvatar; 
         }
     } else {
-        leaderboard.push({ name, score: points, gamesPlayed: 1, avatar: finalAvatar });
+        leaderboard.push({ name: lookupName, score: points, gamesPlayed: 1, avatar: finalAvatar });
     }
     leaderboard.sort((a, b) => b.score - a.score);
     // Keep top 100 in file to avoid bloat
@@ -491,8 +493,19 @@ io.on('connection', (socket) => {
     });
 
     socket.on('get_leaderboard', (data) => {
-        const myName = (data?.name || userSessions[socket.sessionId]?.name || "Guest").trim();
-        const entry = leaderboard.find(l => l.name.trim().toLowerCase() === myName.toLowerCase());
+        const myName = (data?.name || userSessions[socket.sessionId]?.name || "Guest").trim().toUpperCase();
+        
+        // DYNAMIC PATCHING: If the requesting user has a cached avatar, ensure it's in their leaderboard entry
+        const cachedAvatar = userAvatars[socket.sessionId];
+        if (cachedAvatar) {
+            let entry = leaderboard.find(l => l.name.toUpperCase() === myName);
+            if (entry && !entry.avatar) {
+                entry.avatar = cachedAvatar;
+                console.log(`[LEADERBOARD-PATCH] Applied cached avatar to ${myName}`);
+            }
+        }
+
+        const entry = leaderboard.find(l => l.name.toUpperCase() === myName);
         socket.emit('leaderboard_res', {
             top10: leaderboard.slice(0, 10),
             userStats: entry || { name: myName, score: 0, gamesPlayed: 0 }
