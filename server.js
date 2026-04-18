@@ -502,17 +502,17 @@ io.on('connection', (socket) => {
         const cachedAvatar = userAvatars[socket.sessionId];
         if (cachedAvatar) {
             let entry = leaderboard.find(l => l.name.toUpperCase() === lookupName);
-            if (entry && !entry.avatar) {
+            if (entry) {
                 entry.avatar = cachedAvatar;
-                console.log(`[LEADERBOARD-PATCH] Applied cached avatar to ${lookupName}`);
+                console.log(`[LEADERBOARD-UPDATE] Refreshed avatar for ${lookupName}`);
             }
         }
 
         const entry = leaderboard.find(l => l.name.toUpperCase() === lookupName);
         let userStats = entry ? { ...entry } : { name: lookupName, score: 0, gamesPlayed: 0 };
         
-        // Ensure own avatar is present even if record is new
-        if (!userStats.avatar && cachedAvatar) {
+        // Ensure own avatar reflects current session even if record is new
+        if (cachedAvatar) {
             userStats.avatar = cachedAvatar;
         }
 
