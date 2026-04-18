@@ -493,22 +493,32 @@ io.on('connection', (socket) => {
     });
 
     socket.on('get_leaderboard', (data) => {
-        const myName = (data?.name || userSessions[socket.sessionId]?.name || "Guest").trim().toUpperCase();
+        const lookupName = (data?.name || userSessions[socket.sessionId]?.name || "Guest").trim().toUpperCase();
         
-        // DYNAMIC PATCHING: If the requesting user has a cached avatar, ensure it's in their leaderboard entry
+        // INSTANT CACHE: If client sent an avatar with the request, save it now
+        const providedAvatar = data.avatar || null;
+        if (providedAvatar) userAvatars[socket.sessionId] = providedAvatar;
+
         const cachedAvatar = userAvatars[socket.sessionId];
         if (cachedAvatar) {
-            let entry = leaderboard.find(l => l.name.toUpperCase() === myName);
+            let entry = leaderboard.find(l => l.name.toUpperCase() === lookupName);
             if (entry && !entry.avatar) {
                 entry.avatar = cachedAvatar;
-                console.log(`[LEADERBOARD-PATCH] Applied cached avatar to ${myName}`);
+                console.log(`[LEADERBOARD-PATCH] Applied cached avatar to ${lookupName}`);
             }
         }
 
-        const entry = leaderboard.find(l => l.name.toUpperCase() === myName);
+        const entry = leaderboard.find(l => l.name.toUpperCase() === lookupName);
+        let userStats = entry ? { ...entry } : { name: lookupName, score: 0, gamesPlayed: 0 };
+        
+        // Ensure own avatar is present even if record is new
+        if (!userStats.avatar && cachedAvatar) {
+            userStats.avatar = cachedAvatar;
+        }
+
         socket.emit('leaderboard_res', {
             top10: leaderboard.slice(0, 10),
-            userStats: entry || { name: myName, score: 0, gamesPlayed: 0 }
+            userStats
         });
     });
 
