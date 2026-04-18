@@ -424,6 +424,7 @@ io.on('connection', (socket) => {
         const name = data.username || data.name || 'Guest';
         const flag = data.flag || 'us';
         const avatar = data.avatar || null;
+        console.log(`[JOIN_QUEUE] User: ${name}, Avatar length: ${avatar ? avatar.length : 0}`);
         userSessions[socket.sessionId] = { socketId: socket.id, name, flag, avatar };
         waitingQueue.push({ socket, name, flag, avatar, sessionId: socket.sessionId });
         processQueue();
