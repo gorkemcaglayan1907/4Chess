@@ -22,6 +22,7 @@ const VALID_BOT_FLAGS = ['us', 'gb', 'de', 'jp', 'kr', 'it', 'fr', 'es'];
 
 // Persistent Leaderboard Logic
 let leaderboard = []; 
+let userAvatars = {}; // GLOBAL CACHE: sessionId -> avatarBase64
 const LEADERBOARD_PATH = path.join(__dirname, 'leaderboard.json');
 
 try {
@@ -30,20 +31,23 @@ try {
     }
 } catch (e) { console.error("[LEADERBOARD] Load error:", e); }
 
-function updateLeaderboard(name, points, avatar) {
+function updateLeaderboard(name, points, avatar, sessionId) {
     if (!name || name === '...' || name.includes('Bot')) return;
-    console.log(`[LEADERBOARD] Update for ${name}: points=${points}, avatarReceived=${!!avatar}`);
+    
+    // Fallback logic: If avatar is null, try to retrieve from global cache
+    let finalAvatar = avatar || (sessionId ? userAvatars[sessionId] : null);
+    
+    console.log(`[LEADERBOARD] Update for ${name}: pts=${points}, avatarReceived=${!!avatar}, cachedUsed=${(!avatar && !!finalAvatar)}`);
+    
     let entry = leaderboard.find(l => l.name === name);
     if (entry) {
         entry.score += points;
         entry.gamesPlayed = (entry.gamesPlayed || 0) + 1;
-        if (avatar) {
-            console.log(`[LEADERBOARD] Updating avatar for ${name} (len: ${avatar.length})`);
-            entry.avatar = avatar; 
+        if (finalAvatar) {
+            entry.avatar = finalAvatar; 
         }
     } else {
-        console.log(`[LEADERBOARD] Creating NEW entry for ${name} with avatar=${!!avatar}`);
-        leaderboard.push({ name, score: points, gamesPlayed: 1, avatar });
+        leaderboard.push({ name, score: points, gamesPlayed: 1, avatar: finalAvatar });
     }
     leaderboard.sort((a, b) => b.score - a.score);
     // Keep top 100 in file to avoid bloat
@@ -219,7 +223,7 @@ function forceBotMove(roomId) {
             room.bots.push(currentColor);
             if (room.isQuickPlay && !room.updatedPlayers.includes(humanSessionId)) {
                 room.updatedPlayers.push(humanSessionId);
-                updateLeaderboard(room.playerNames[currentColor], -50, room.playerAvatars[currentColor]);
+                updateLeaderboard(room.playerNames[currentColor], -50, room.playerAvatars[currentColor], humanSessionId);
             }
             delete room.players[humanSessionId];
             io.to(roomId).emit('chat_msg', { name: 'System', text: `${room.playerNames[currentColor]} kicked (-50 pts). Bot takes over.`, color: 'red' });
@@ -331,7 +335,7 @@ function broadcastRoomState(roomId, moveResult = {}) {
                 room.updatedPlayers.push(sid);
                 let pts = room.game.scores[color] || 0;
                 if (room.game.winner === color) pts += 50; 
-                updateLeaderboard(name, pts, room.playerAvatars[color]);
+                updateLeaderboard(name, pts, room.playerAvatars[color], sid);
             }
         });
     }
@@ -383,7 +387,7 @@ function purgePlayer(sessionId) {
             room.bots.push(color);
             if (room.isQuickPlay && !room.updatedPlayers.includes(sessionId)) {
                 room.updatedPlayers.push(sessionId);
-                updateLeaderboard(room.playerNames[color], -50, room.playerAvatars[color]); 
+                updateLeaderboard(room.playerNames[color], -50, room.playerAvatars[color], sessionId); 
             }
             delete room.players[sessionId];
             io.to(roomId).emit('chat_msg', { name: 'System', text: `${room.playerNames[color]} left (-50 pts). Bot takes over.`, color: 'red' });
@@ -437,6 +441,7 @@ io.on('connection', (socket) => {
         const name = data.username || data.name || 'Guest';
         const flag = data.flag || 'us';
         const avatar = data.avatar || null;
+        if (avatar) userAvatars[socket.sessionId] = avatar; // ALWAYS CACHE Latest
         console.log(`[JOIN_QUEUE] User: ${name}, Avatar length: ${avatar ? avatar.length : 0}`);
         userSessions[socket.sessionId] = { socketId: socket.id, name, flag, avatar };
         waitingQueue.push({ socket, name, flag, avatar, sessionId: socket.sessionId });
@@ -449,6 +454,7 @@ io.on('connection', (socket) => {
         const name = data.name || 'Guest';
         const flag = data.flag || 'us';
         const avatar = data.avatar || null;
+        if (avatar) userAvatars[socket.sessionId] = avatar;
         userSessions[socket.sessionId] = { socketId: socket.id, name, flag, avatar };
         customRooms[code] = { teamMode: data.teamMode || false, players: [{ socket, name, flag, avatar, sessionId: socket.sessionId, isHost: true }] };
         socket.emit('custom_room_joined', { code, count: 1, names: [name], isHost: true });
@@ -461,6 +467,7 @@ io.on('connection', (socket) => {
             const name = data.name || 'Guest';
             const flag = data.flag || 'us';
             const avatar = data.avatar || null;
+            if (avatar) userAvatars[socket.sessionId] = avatar;
             userSessions[socket.sessionId] = { socketId: socket.id, name, flag, avatar };
             customRooms[code].players.push({ socket, name, flag, avatar, sessionId: socket.sessionId });
             let names = customRooms[code].players.map(p => p.name);
