@@ -22,9 +22,11 @@ const VALID_BOT_FLAGS = ['us', 'gb', 'de', 'jp', 'kr', 'it', 'fr', 'es'];
 
 // Persistent Leaderboard Logic
 let leaderboard = []; 
+const LEADERBOARD_PATH = path.join(__dirname, 'leaderboard.json');
+
 try {
-    if (fs.existsSync('leaderboard.json')) {
-        leaderboard = JSON.parse(fs.readFileSync('leaderboard.json', 'utf8'));
+    if (fs.existsSync(LEADERBOARD_PATH)) {
+        leaderboard = JSON.parse(fs.readFileSync(LEADERBOARD_PATH, 'utf8'));
     }
 } catch (e) { console.error("[LEADERBOARD] Load error:", e); }
 
@@ -47,7 +49,7 @@ function updateLeaderboard(name, points, avatar) {
     // Keep top 100 in file to avoid bloat
     if (leaderboard.length > 100) leaderboard = leaderboard.slice(0, 100);
     try {
-        fs.writeFileSync('leaderboard.json', JSON.stringify(leaderboard));
+        fs.writeFileSync(LEADERBOARD_PATH, JSON.stringify(leaderboard));
     } catch (e) {
         console.error("[LEADERBOARD] Save error:", e);
     }
