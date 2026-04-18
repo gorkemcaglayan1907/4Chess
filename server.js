@@ -81,6 +81,7 @@ function setupMatch(playersInMatch, roomData = {}) {
 
     let players = {}; 
     let playerNames = {};
+    let playerAvatars = {};
     let playerFlags = {};
     let bots = [];
     
@@ -101,6 +102,7 @@ function setupMatch(playersInMatch, roomData = {}) {
 
         players[sid] = assignedColor;
         playerNames[assignedColor] = p.name || "Guest";
+        playerAvatars[assignedColor] = p.avatar || null;
         playerFlags[assignedColor] = p.flag || "us";
         userRooms[sid] = roomId;
         p.socket.join(roomId);
@@ -116,7 +118,7 @@ function setupMatch(playersInMatch, roomData = {}) {
     });
 
     rooms[roomId] = { 
-        game, players, playerNames, playerFlags, bots, 
+        game, players, playerNames, playerAvatars, playerFlags, bots, 
         isQuickPlay: !!roomData.isQuickPlay,
         turnTimer: null, turnEndTime: 0, 
         lastMoveTime: Date.now(),
@@ -324,6 +326,7 @@ function broadcastRoomState(roomId, moveResult = {}) {
     io.to(roomId).emit('state_update', {
         board: room.game.board, turnIndex: room.game.turnIndex,
         activePlayers: room.game.activePlayers, scores: room.game.scores, 
+        playerAvatars: room.playerAvatars,
         gameOver: room.game.gameOver, winner: room.game.winner,
         turnEndTime: room.turnEndTime, serverTime: Date.now(), lastMove: room.game.lastMove, roomId: roomId,
         isQuickPlay: !!room.isQuickPlay,
@@ -337,7 +340,7 @@ function getInitState(roomId) {
         board: room.game.board, turnIndex: room.game.turnIndex,
         activePlayers: room.game.activePlayers, scores: room.game.scores,
         gameOver: room.game.gameOver, winner: room.game.winner,
-        playerNames: room.playerNames, playerFlags: room.playerFlags, turnEndTime: room.turnEndTime,
+        playerNames: room.playerNames, playerAvatars: room.playerAvatars, playerFlags: room.playerFlags, turnEndTime: room.turnEndTime,
         serverTime: Date.now(), lastMove: room.game.lastMove, roomId: roomId,
         isQuickPlay: !!room.isQuickPlay
     };
@@ -420,8 +423,9 @@ io.on('connection', (socket) => {
         purgePlayer(socket.sessionId);
         const name = data.username || data.name || 'Guest';
         const flag = data.flag || 'us';
-        userSessions[socket.sessionId] = { socketId: socket.id, name, flag };
-        waitingQueue.push({ socket, name, flag, sessionId: socket.sessionId });
+        const avatar = data.avatar || null;
+        userSessions[socket.sessionId] = { socketId: socket.id, name, flag, avatar };
+        waitingQueue.push({ socket, name, flag, avatar, sessionId: socket.sessionId });
         processQueue();
     });
 
@@ -430,8 +434,9 @@ io.on('connection', (socket) => {
         let code = generateRoomCode();
         const name = data.name || 'Guest';
         const flag = data.flag || 'us';
-        userSessions[socket.sessionId] = { socketId: socket.id, name, flag };
-        customRooms[code] = { teamMode: data.teamMode || false, players: [{ socket, name, flag, sessionId: socket.sessionId, isHost: true }] };
+        const avatar = data.avatar || null;
+        userSessions[socket.sessionId] = { socketId: socket.id, name, flag, avatar };
+        customRooms[code] = { teamMode: data.teamMode || false, players: [{ socket, name, flag, avatar, sessionId: socket.sessionId, isHost: true }] };
         socket.emit('custom_room_joined', { code, count: 1, names: [name], isHost: true });
     });
 
@@ -441,8 +446,9 @@ io.on('connection', (socket) => {
             purgePlayer(socket.sessionId);
             const name = data.name || 'Guest';
             const flag = data.flag || 'us';
-            userSessions[socket.sessionId] = { socketId: socket.id, name, flag };
-            customRooms[code].players.push({ socket, name, flag, sessionId: socket.sessionId });
+            const avatar = data.avatar || null;
+            userSessions[socket.sessionId] = { socketId: socket.id, name, flag, avatar };
+            customRooms[code].players.push({ socket, name, flag, avatar, sessionId: socket.sessionId });
             let names = customRooms[code].players.map(p => p.name);
             customRooms[code].players.forEach(p => p.socket.emit('custom_room_joined', { code, count: customRooms[code].players.length, names, isHost: !!p.isHost }));
             if (customRooms[code].players.length === 4) processCustomRoom(code);

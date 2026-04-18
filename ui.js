@@ -58,6 +58,10 @@ window.addEventListener('DOMContentLoaded', () => {
 
     function saveName() {
         let name = usernameInput.value.trim() || 'Guest';
+        if (name !== 'Guest' && name.length < 6) {
+            alert("Nickname must be at least 6 characters long.");
+            return null;
+        }
         try { localStorage.setItem('4chess_username', name); } catch(e) {}
         return name;
     }
@@ -72,11 +76,11 @@ window.addEventListener('DOMContentLoaded', () => {
         if(target) target.classList.remove('hidden');
     }
 
-    const btnQuick = document.getElementById('btn-quick-play');
     if (btnQuick) {
         btnQuick.addEventListener('click', () => {
             if (window.audio) window.audio.unlock();
             let name = saveName();
+            if (!name) return;
             socket.emit('join_queue', { username: name, flag: 'us' });
             showScreen('lobby-screen');
         });
@@ -87,6 +91,7 @@ window.addEventListener('DOMContentLoaded', () => {
         btnCreate.addEventListener('click', () => {
             if (window.audio) window.audio.unlock();
             let name = saveName();
+            if (!name) return;
             socket.emit('create_room', { name, flag: 'us' });
             showScreen('lobby-screen');
         });
@@ -105,6 +110,8 @@ window.addEventListener('DOMContentLoaded', () => {
     if(btnCancel) btnCancel.addEventListener('click', () => location.reload());
     const btnBackLobby = document.getElementById('btn-back-to-lobby');
     if(btnBackLobby) btnBackLobby.addEventListener('click', () => location.reload());
+    const btnBackLobbyGameOver = document.getElementById('btn-back-to-lobby-gameover');
+    if(btnBackLobbyGameOver) btnBackLobbyGameOver.addEventListener('click', () => location.reload());
     const btnLeaderboard = document.getElementById('btn-leaderboard');
     if(btnLeaderboard) btnLeaderboard.addEventListener('click', () => socket.emit('get_leaderboard'));
     window.handleResign = () => {
@@ -204,6 +211,7 @@ window.addEventListener('DOMContentLoaded', () => {
         if (state.scores) playerScoresMap = state.scores;
         if (state.activePlayers) playerActiveMap = state.activePlayers;
         if (state.playerNames) playerNamesMap = state.playerNames;
+        if (state.playerAvatars) gameData.playerAvatars = state.playerAvatars;
         if (state.gameOver !== undefined) gameData.gameOver = state.gameOver;
         if (state.winner !== undefined) gameData.winner = state.winner;
         if (state.lastMove !== undefined) gameData.lastMove = state.lastMove;
@@ -349,8 +357,9 @@ window.addEventListener('DOMContentLoaded', () => {
             playerList.innerHTML = '';
             CHESS_COLORS.forEach(c => {
                 let isTurn = gameData && turnColor === c && !gameData.gameOver;
-                const pColors = { white: '#22c55e', blue: '#3b82f6', black: '#fbbf24', red: '#ef4444' };
+                const pColors = { white: '#22c55e', blue: '#3b82f6', black: '#94a3b8', red: '#ef4444' };
                 const currentColor = pColors[c] || '#fbbf24';
+                const playerAvatar = gameData.playerAvatars ? gameData.playerAvatars[c] : null;
                 
                 const item = document.createElement('div');
                 item.className = 'player-item';
@@ -359,7 +368,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 item.style.color = currentColor;
 
                 item.innerHTML = `
-                    <div class="player-dot" style="background-color: ${currentColor}"></div>
+                    ${playerAvatar ? `<img src="${playerAvatar}" style="width:14px; height:14px; border-radius:50%; margin-right:8px;">` : `<div class="player-dot" style="background-color: ${currentColor}"></div>`}
                     <div class="player-info-meta">
                         <span class="player-name-text">${playerNamesMap[c] || '...'}</span>
                         <span class="player-score-text">${playerScoresMap[c] || 0}P</span>
@@ -374,7 +383,7 @@ window.addEventListener('DOMContentLoaded', () => {
         if (alertBox) {
             const isMyTurn = myColor && turnColor === myColor && !gameData.gameOver;
             if (isMyTurn) {
-                const myColors = { white: '#22c55e', blue: '#3b82f6', black: '#fbbf24', red: '#ef4444' };
+                const myColors = { white: '#22c55e', blue: '#3b82f6', black: '#000', red: '#ef4444' };
                 alertBox.style.backgroundColor = myColors[myColor] || '#10b981';
                 alertBox.style.display = 'block';
             } else {
@@ -387,6 +396,58 @@ window.addEventListener('DOMContentLoaded', () => {
             if(btnResign) btnResign.classList.add('hidden');
             const ct = document.getElementById('chat-toggle-btn');
             if(ct) ct.classList.add('hidden');
+
+            const goMod = document.getElementById('game-over-modal');
+            if (goMod && goMod.classList.contains('hidden')) {
+                goMod.classList.remove('hidden');
+                
+                const scoresArr = Object.entries(playerScoresMap).sort((a,b)=>b[1]-a[1]);
+                let winColor = scoresArr.length > 0 ? scoresArr[0][0] : 'white';
+                if (gameData.winner && gameData.winner !== 'draw') winColor = gameData.winner;
+                
+                const pColors = { white: '#22c55e', blue: '#3b82f6', black: '#94a3b8', red: '#ef4444' };
+                const hexColor = pColors[winColor] || '#facc15';
+
+                const winFrame = document.getElementById('winner-frame-container');
+                if (winFrame) winFrame.style.borderColor = hexColor;
+
+                const rankBox = document.getElementById('game-over-rankings');
+                if (rankBox) {
+                    rankBox.innerHTML = '';
+                    scoresArr.forEach(([c, s], idx) => {
+                        let rankHtml = document.createElement('div');
+                        rankHtml.className = 'rank-item';
+                        rankHtml.innerHTML = `<span>${idx+1}. <span style="color:${pColors[c]||'#fff'}">${playerNamesMap[c] || c}</span></span> <span><span style="color:#facc15">${s}</span>P</span>`;
+                        rankBox.appendChild(rankHtml);
+                    });
+                }
+
+                const winTxt = document.getElementById('game-over-winner');
+                if (winTxt) {
+                    if (gameData.winner === 'draw') {
+                        winTxt.innerText = "DRAW";
+                        winTxt.style.color = '#fff';
+                    } else {
+                        winTxt.innerText = `WINNER: ${playerNamesMap[winColor] || winColor}`;
+                        winTxt.style.color = hexColor;
+                    }
+                }
+
+                const fwTimer = setInterval(() => {
+                    const fwContainer = document.getElementById('fireworks-container');
+                    if (!fwContainer || goMod.classList.contains('hidden')) return clearInterval(fwTimer);
+                    for (let i = 0; i < 20; i++) {
+                        let f = document.createElement('div');
+                        f.className = 'firework';
+                        f.style.background = hexColor;
+                        f.style.left = (Math.random() * 100) + 'vw';
+                        f.style.top = (Math.random() * 50 + 50) + 'vh';
+                        f.style.setProperty('--ty', `-${Math.random() * 300 + 100}px`);
+                        fwContainer.appendChild(f);
+                        setTimeout(() => f.remove(), 1000);
+                    }
+                }, 400);
+            }
         } else if (myColor && btnResign) {
             btnResign.classList.remove('hidden');
         }
