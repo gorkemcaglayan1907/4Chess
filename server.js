@@ -3,7 +3,8 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http, {
     cors: { origin: "*", methods: ["GET", "POST"] },
-    transports: ['websocket', 'polling']
+    transports: ['websocket', 'polling'],
+    maxHttpBufferSize: 5e6 // 5MB
 });
 
 const { GameEngine, CHESS_COLORS } = require('./engine.js');
