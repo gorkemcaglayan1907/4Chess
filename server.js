@@ -28,19 +28,24 @@ try {
     }
 } catch (e) { console.error("[LEADERBOARD] Load error:", e); }
 
-function updateLeaderboard(name, points) {
+function updateLeaderboard(name, points, avatar) {
     if (!name || name === '...' || name.includes('Bot')) return;
     let entry = leaderboard.find(l => l.name === name);
     if (entry) {
         entry.score += points;
         entry.gamesPlayed = (entry.gamesPlayed || 0) + 1;
+        if (avatar) entry.avatar = avatar; // Update to latest avatar
     } else {
-        leaderboard.push({ name, score: points, gamesPlayed: 1 });
+        leaderboard.push({ name, score: points, gamesPlayed: 1, avatar });
     }
     leaderboard.sort((a, b) => b.score - a.score);
     // Keep top 100 in file to avoid bloat
     if (leaderboard.length > 100) leaderboard = leaderboard.slice(0, 100);
-    fs.writeFileSync('leaderboard.json', JSON.stringify(leaderboard));
+    try {
+        fs.writeFileSync('leaderboard.json', JSON.stringify(leaderboard));
+    } catch (e) {
+        console.error("[LEADERBOARD] Save error:", e);
+    }
 }
 
 
@@ -207,7 +212,7 @@ function forceBotMove(roomId) {
             room.bots.push(currentColor);
             if (room.isQuickPlay && !room.updatedPlayers.includes(humanSessionId)) {
                 room.updatedPlayers.push(humanSessionId);
-                updateLeaderboard(room.playerNames[currentColor], -50);
+                updateLeaderboard(room.playerNames[currentColor], -50, room.playerAvatars[currentColor]);
             }
             delete room.players[humanSessionId];
             io.to(roomId).emit('chat_msg', { name: 'System', text: `${room.playerNames[currentColor]} kicked (-50 pts). Bot takes over.`, color: 'red' });
@@ -319,7 +324,7 @@ function broadcastRoomState(roomId, moveResult = {}) {
                 room.updatedPlayers.push(sid);
                 let pts = room.game.scores[color] || 0;
                 if (room.game.winner === color) pts += 50; 
-                updateLeaderboard(name, pts);
+                updateLeaderboard(name, pts, room.playerAvatars[color]);
             }
         });
     }
@@ -371,7 +376,7 @@ function purgePlayer(sessionId) {
             room.bots.push(color);
             if (room.isQuickPlay && !room.updatedPlayers.includes(sessionId)) {
                 room.updatedPlayers.push(sessionId);
-                updateLeaderboard(room.playerNames[color], -50); 
+                updateLeaderboard(room.playerNames[color], -50, room.playerAvatars[color]); 
             }
             delete room.players[sessionId];
             io.to(roomId).emit('chat_msg', { name: 'System', text: `${room.playerNames[color]} left (-50 pts). Bot takes over.`, color: 'red' });

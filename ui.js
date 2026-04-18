@@ -44,20 +44,21 @@ window.addEventListener('DOMContentLoaded', () => {
 
     if (!usernameInput) return;
 
-    // Persistence
+    // Persistence & Real-time Uppercase
     try {
-        const savedUsername = localStorage.getItem('4chess_username');
-        if (savedUsername) {
-            usernameInput.value = savedUsername;
-        } else {
-            usernameInput.value = 'Player_' + Math.random().toString(36).substring(7).toUpperCase();
-        }
+        const saved = localStorage.getItem('4chess_username');
+        if (saved) usernameInput.value = saved.toUpperCase();
+        else usernameInput.value = 'PLAYER_' + Math.floor(Math.random() * 9999);
     } catch (e) {
-        usernameInput.value = 'Player_' + Math.floor(Math.random()*9999);
+        usernameInput.value = 'PLAYER_' + Math.floor(Math.random() * 9999);
     }
 
+    usernameInput.addEventListener('input', () => {
+        usernameInput.value = usernameInput.value.toUpperCase();
+    });
+
     function saveName() {
-        let name = usernameInput.value.trim() || 'Guest';
+        let name = usernameInput.value.trim().toUpperCase() || 'Guest';
         if (name !== 'Guest' && name.length < 6) {
             alert("Nickname must be at least 6 characters long.");
             return null;
@@ -368,9 +369,9 @@ window.addEventListener('DOMContentLoaded', () => {
                 item.style.color = currentColor;
 
                 item.innerHTML = `
-                    ${playerAvatar ? `<img src="${playerAvatar}" style="width:14px; height:14px; border-radius:50%; margin-right:8px;">` : `<div class="player-dot" style="background-color: ${currentColor}"></div>`}
+                    ${playerAvatar ? `<img src="${playerAvatar}" style="width:22px; height:22px; border-radius:50%; margin-right:8px; object-fit:cover;">` : `<div class="player-dot" style="background-color: ${currentColor}"></div>`}
                     <div class="player-info-meta">
-                        <span class="player-name-text">${playerNamesMap[c] || '...'}</span>
+                        <span class="player-name-text">${(playerNamesMap[c] || '...').toUpperCase()}</span>
                         <span class="player-score-text">${playerScoresMap[c] || 0}P</span>
                     </div>
                 `;
@@ -417,7 +418,7 @@ window.addEventListener('DOMContentLoaded', () => {
                     scoresArr.forEach(([c, s], idx) => {
                         let rankHtml = document.createElement('div');
                         rankHtml.className = 'rank-item';
-                        rankHtml.innerHTML = `<span>${idx+1}. <span style="color:${pColors[c]||'#fff'}">${playerNamesMap[c] || c}</span></span> <span><span style="color:#facc15">${s}</span>P</span>`;
+                        rankHtml.innerHTML = `<span>${idx+1}. <span style="color:${pColors[c]||'#fff'}">${(playerNamesMap[c] || c).toUpperCase()}</span></span> <span><span style="color:#facc15">${s}</span>P</span>`;
                         rankBox.appendChild(rankHtml);
                     });
                 }
@@ -428,7 +429,7 @@ window.addEventListener('DOMContentLoaded', () => {
                         winTxt.innerText = "DRAW";
                         winTxt.style.color = '#fff';
                     } else {
-                        winTxt.innerText = `WINNER: ${playerNamesMap[winColor] || winColor}`;
+                        winTxt.innerText = `WINNER: ${(playerNamesMap[winColor] || winColor).toUpperCase()}`;
                         winTxt.style.color = hexColor;
                     }
                 }
@@ -499,8 +500,14 @@ window.addEventListener('DOMContentLoaded', () => {
         div.innerHTML = list.length === 0 ? 'No champions yet.' : '';
         list.forEach((item, index) => {
             let row = document.createElement('div');
-            row.style.padding = "10px"; row.style.borderBottom = "1px solid #1e293b";
-            row.innerHTML = `<strong>${index+1}.</strong> ${item.name} - <span style="color:#eab308">${item.score}P</span>`;
+            row.className = 'rank-item'; // Use existing class for consistency
+            row.style.display = 'flex'; row.style.alignItems = 'center'; row.style.padding = "12px"; row.style.borderBottom = "1px solid #1e293b";
+            row.innerHTML = `
+                <div style="width: 40px; text-align: center; font-weight: 800;">${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : index + 1 + '.'}</div>
+                ${item.avatar ? `<img src="${item.avatar}" style="width:28px; height:28px; border-radius:50%; margin-left:10px; object-fit:cover; border: 1px solid #334155;">` : `<div style="width:28px; height:28px; border-radius:50%; background:#1e293b; color:#475569; display:flex; align-items:center; justify-content:center; margin-left:10px; border: 1px solid #334155;"><i class="fas fa-user" style="font-size:14px;"></i></div>`}
+                <div style="flex: 1; margin-left: 15px; font-weight: 700; color: #fff;">${(item.name || '').toUpperCase()}</div>
+                <div style="font-weight: 900; color: #fbbf24; margin-left: 10px;">${item.score}P</div>
+            `;
             div.appendChild(row);
         });
         let mod = document.getElementById('leaderboard-modal');
