@@ -30,12 +30,17 @@ try {
 
 function updateLeaderboard(name, points, avatar) {
     if (!name || name === '...' || name.includes('Bot')) return;
+    console.log(`[LEADERBOARD] Update for ${name}: points=${points}, avatarReceived=${!!avatar}`);
     let entry = leaderboard.find(l => l.name === name);
     if (entry) {
         entry.score += points;
         entry.gamesPlayed = (entry.gamesPlayed || 0) + 1;
-        if (avatar) entry.avatar = avatar; // Update to latest avatar
+        if (avatar) {
+            console.log(`[LEADERBOARD] Updating avatar for ${name} (len: ${avatar.length})`);
+            entry.avatar = avatar; 
+        }
     } else {
+        console.log(`[LEADERBOARD] Creating NEW entry for ${name} with avatar=${!!avatar}`);
         leaderboard.push({ name, score: points, gamesPlayed: 1, avatar });
     }
     leaderboard.sort((a, b) => b.score - a.score);
