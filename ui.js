@@ -506,7 +506,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 <div style="width: 40px; text-align: center; font-weight: 800;">${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : index + 1 + '.'}</div>
                 ${item.avatar ? `<img src="${item.avatar}" style="width:28px; height:28px; border-radius:50%; margin-left:10px; object-fit:cover; border: 1px solid #334155;">` : `<div style="width:28px; height:28px; border-radius:50%; background:#1e293b; color:#475569; display:flex; align-items:center; justify-content:center; margin-left:10px; border: 1px solid #334155;"><i class="fas fa-user" style="font-size:14px;"></i></div>`}
                 <div style="flex: 1; margin-left: 15px; font-weight: 700; color: #fff;">${(item.name || '').toUpperCase()}</div>
-                <div style="font-weight: 900; color: #fbbf24; margin-left: 10px;">${item.score}P</div>
+                <div style="font-weight: 900; color: #fff; margin-left: 10px;">${item.score}P</div>
             `;
             div.appendChild(row);
         });
