@@ -290,31 +290,33 @@ setInterval(() => {
         const roomSockets = io.sockets.adapter.rooms.get(rid);
         const connectedCount = roomSockets ? roomSockets.size : 0;
         
-        // Rules for deletion:
-        // 1. If game is NOT over and has connected human sockets, NEVER delete.
-        // 2. If game IS over, wait 5 minutes before deleting unless it's completely empty.
-        // 3. If room is completely empty (no connected sockets), delete after 60 seconds of inactivity.
+        // Rules for deletion (RESILIENT VERSION):
+        // 1. If game is NOT over, NEVER delete based on socket counts alone. 
+        //    Active games persist for 1 hour (3600s) even if empty (network flickers).
+        // 2. If game IS over, wait 15 minutes before deleting unless it's completely empty.
+        // 3. Keep zombie rooms (no humans) for 5 minutes.
         
-        let deleteThreshold = 300000; // 5 minutes default for most cases
+        let deleteThreshold = 3600000; // 1 hour default for ACTIVE games
         
         if (room.game.gameOver) {
-            // Game is over. If people are still connected, give them time (5 mins).
-            // If NO ONE is connected, delete after 60s.
-            deleteThreshold = (connectedCount === 0) ? 60000 : 300000;
+            // Game is over. If people are still connected, give them time (15 mins).
+            // If NO ONE is connected, delete after 5 minutes.
+            deleteThreshold = (connectedCount === 0) ? 300000 : 900000;
         } else {
-            // Game is NOT over.
-            if (connectedCount > 0) return; // Active game with people watching/playing. Don't touch.
-            
-            // If no one is connected but there are "players" (humanCount > 0), they might have DC'd.
-            // Give them 2 minutes to return before deleting the room due to "ghost" inactivity.
-            deleteThreshold = (humanCount === 0) ? 60000 : 120000;
+            // Active Game: Handle "Ghost" matches (only bots left)
+            let humanCount = Object.keys(room.players).length;
+            if (humanCount === 0) {
+                deleteThreshold = 300000; // 5 mins if all humans left/kicked
+            } else {
+                deleteThreshold = 3600000; // 1 hour for humans to reconnect/play
+            }
         }
 
         if (now - (room.lastMoveTime || room.createdAt) > deleteThreshold) {
             deleteRoom(rid);
         }
     });
-}, 30000); // Check every 30 seconds
+}, 60000); // Check every minute (less resource heavy)
 
 function startTurnTimer(roomId) {
     let room = rooms[roomId];
@@ -428,6 +430,7 @@ io.on('connection', (socket) => {
         } else {
             let assignedColor = rooms[roomId].players[sessionId];
             if (assignedColor) {
+                rooms[roomId].lastMoveTime = Date.now(); // Activity heartbeat
                 socket.join(roomId);
                 socket.emit('match_found', { color: assignedColor, roomId });
                 socket.emit('init_state', getInitState(roomId));
@@ -542,6 +545,7 @@ io.on('connection', (socket) => {
         let roomId = userRooms[socket.sessionId];
         let room = rooms[roomId];
         if (!room) return;
+        room.lastMoveTime = Date.now(); // Activity heartbeat
         let color = room.players[socket.sessionId];
         io.to(roomId).emit('chat_msg', { color, name: room.playerNames[color], text: data.text });
     });
